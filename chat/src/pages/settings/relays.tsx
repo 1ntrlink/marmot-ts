@@ -1,22 +1,36 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { extraRelays$, lookupRelays$ } from "@/lib/settings";
+import {
+  AddInboxRelay,
+  AddOutboxRelay,
+  RemoveInboxRelay,
+  RemoveOutboxRelay,
+} from "applesauce-actions/actions/mailboxes";
 import { ensureHttpURL, relaySet } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
-import { WifiIcon, WifiOffIcon } from "lucide-react";
+import { Loader2Icon, WifiIcon, WifiOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { actions, user$ } from "../../lib/accounts";
 import { pool } from "../../lib/nostr";
 
-function RelayItem({
+export function RelayItem({
   relay,
   onRemove,
 }: {
   relay: string;
-  onRemove: () => void;
+  onRemove: () => any | Promise<any>;
 }) {
   const inst = useMemo(() => pool.relay(relay), [relay]);
   const icon = use$(inst.icon$);
   const connected = use$(inst.connected$);
+  const [removing, setRemoving] = useState(false);
+
+  const handleRemove = async () => {
+    setRemoving(true);
+    await onRemove();
+    setRemoving(false);
+  };
 
   return (
     <div className="flex items-center gap-2">
@@ -33,43 +47,67 @@ function RelayItem({
           <WifiOffIcon className="w-4 h-4 text-gray-500" />
         )}
       </span>
-      <Button variant="destructive" size="sm" onClick={onRemove}>
-        Remove
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={handleRemove}
+        disabled={removing}
+      >
+        {removing ? <Loader2Icon className="w-4 h-4 animate-spin" /> : "Remove"}
       </Button>
     </div>
   );
 }
 
-export default function SettingsRelaysPage() {
-  const lookupRelays = use$(lookupRelays$);
-  const extraRelays = use$(extraRelays$);
-  const [newLookupRelay, setNewLookupRelay] = useState("");
-  const [newExtraRelay, setNewExtraRelay] = useState("");
-
-  const handleAddLookupRelay = () => {
-    if (newLookupRelay.trim()) {
-      const newRelays = [...new Set([...lookupRelays, newLookupRelay.trim()])];
-      lookupRelays$.next(newRelays);
-      setNewLookupRelay("");
+export function NewRelayForm({
+  onAdd,
+}: {
+  onAdd: (relay: string) => any | Promise<any>;
+}) {
+  const [newRelay, setNewRelay] = useState("");
+  const [adding, setAdding] = useState(false);
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAdd();
     }
+  };
+
+  const handleAdd = async () => {
+    setAdding(true);
+    await onAdd(newRelay.trim());
+    setAdding(false);
+  };
+
+  return (
+    <form className="flex gap-2 w-full" onSubmit={handleAdd}>
+      <Input
+        type="text"
+        placeholder="wss://relay.example.com"
+        value={newRelay}
+        onChange={(e) => setNewRelay(e.target.value)}
+        onKeyDown={handleKeyPress}
+        className="flex-1"
+        disabled={adding}
+      />
+      <Button type="submit" disabled={!newRelay.trim() || adding}>
+        Add
+      </Button>
+    </form>
+  );
+}
+
+function LookupRelaysSection() {
+  const lookupRelays = use$(lookupRelays$);
+
+  const handleAddLookupRelay = (relay: string) => {
+    const newRelays = [...new Set([...lookupRelays, relay])];
+    lookupRelays$.next(newRelays);
   };
 
   const handleRemoveLookupRelay = (relay: string) => {
     const newRelays = lookupRelays.filter((r) => r !== relay);
     lookupRelays$.next(newRelays);
-  };
-
-  const handleAddExtraRelay = () => {
-    if (newExtraRelay.trim()) {
-      const newRelays = [...new Set([...extraRelays, newExtraRelay.trim()])];
-      extraRelays$.next(newRelays);
-      setNewExtraRelay("");
-    }
-  };
-
-  const handleRemoveExtraRelay = (relay: string) => {
-    const newRelays = extraRelays.filter((r) => r !== relay);
-    extraRelays$.next(newRelays);
   };
 
   const resetLookupRelays = () => {
@@ -78,6 +116,102 @@ export default function SettingsRelaysPage() {
       "wss://index.hzrd149.com/",
       "wss://indexer.coracle.social/",
     ]);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-semibold">Lookup Relays</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Used for discovering user profiles and relay lists
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={resetLookupRelays}
+          title="Reset to default lookup relays"
+        >
+          Reset
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {lookupRelays.map((relay, index) => (
+          <RelayItem
+            key={index}
+            relay={relay}
+            onRemove={() => handleRemoveLookupRelay(relay)}
+          />
+        ))}
+      </div>
+
+      <NewRelayForm onAdd={handleAddLookupRelay} />
+    </div>
+  );
+}
+
+function OutboxRelaysSection() {
+  const outboxes = use$(user$.outboxes$);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-semibold">Outbox Relays</h2>
+      <p className="text-sm text-muted-foreground mt-1">
+        Relays where your events are published for others to find
+      </p>
+
+      <div className="space-y-2">
+        {outboxes?.map((outbox, index) => (
+          <RelayItem
+            key={index}
+            relay={outbox}
+            onRemove={() => actions.run(RemoveOutboxRelay, outbox)}
+          />
+        ))}
+      </div>
+
+      <NewRelayForm onAdd={(relay) => actions.run(AddOutboxRelay, relay)} />
+    </div>
+  );
+}
+
+function InboxRelaysSection() {
+  const inboxes = use$(user$.inboxes$);
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-2xl font-semibold">Inbox Relays</h2>
+      <p className="text-sm text-muted-foreground mt-1">
+        Relays used by other users to send you events
+      </p>
+
+      <div className="space-y-2">
+        {inboxes?.map((inbox, index) => (
+          <RelayItem
+            key={index}
+            relay={inbox}
+            onRemove={() => actions.run(RemoveInboxRelay, inbox)}
+          />
+        ))}
+      </div>
+
+      <NewRelayForm onAdd={(relay) => actions.run(AddInboxRelay, relay)} />
+    </div>
+  );
+}
+
+function ExtraRelaysSection() {
+  const extraRelays = use$(extraRelays$);
+
+  const handleAddExtraRelay = (relay: string) => {
+    const newRelays = [...new Set([...extraRelays, relay])];
+    extraRelays$.next(newRelays);
+  };
+
+  const handleRemoveExtraRelay = (relay: string) => {
+    const newRelays = extraRelays.filter((r) => r !== relay);
+    extraRelays$.next(newRelays);
   };
 
   const resetExtraRelays = () => {
@@ -92,113 +226,46 @@ export default function SettingsRelaysPage() {
     );
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent, type: "lookup" | "extra") => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      switch (type) {
-        case "lookup":
-          handleAddLookupRelay();
-          break;
-        case "extra":
-          handleAddExtraRelay();
-          break;
-      }
-    }
-  };
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-semibold">Extra Relays</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Always used when fetching or publishing events across the app
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={resetExtraRelays}
+          title="Reset to default extra relays"
+        >
+          Reset
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {extraRelays.map((relay, index) => (
+          <RelayItem
+            key={index}
+            relay={relay}
+            onRemove={() => handleRemoveExtraRelay(relay)}
+          />
+        ))}
+      </div>
 
+      <NewRelayForm onAdd={handleAddExtraRelay} />
+    </div>
+  );
+}
+
+export default function SettingsRelaysPage() {
   return (
     <div className="w-full max-w-2xl space-y-8 p-4">
-      {/* Lookup Relays Section */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-semibold">Lookup Relays</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Used for discovering user profiles and relay lists
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetLookupRelays}
-            title="Reset to default lookup relays"
-          >
-            Reset
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {lookupRelays.map((relay, index) => (
-            <RelayItem
-              key={index}
-              relay={relay}
-              onRemove={() => handleRemoveLookupRelay(relay)}
-            />
-          ))}
-        </div>
-
-        <div className="flex gap-2 w-full">
-          <Input
-            type="text"
-            placeholder="wss://relay.example.com"
-            value={newLookupRelay}
-            onChange={(e) => setNewLookupRelay(e.target.value)}
-            onKeyDown={(e) => handleKeyPress(e, "lookup")}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleAddLookupRelay}
-            disabled={!newLookupRelay.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </div>
-
-      {/* Extra Relays Section */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center">
-          <div>
-            <h2 className="text-2xl font-semibold">Extra Relays</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              Always used when fetching events across the app
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={resetExtraRelays}
-            title="Reset to default extra relays"
-          >
-            Reset
-          </Button>
-        </div>
-        <div className="space-y-2">
-          {extraRelays.map((relay, index) => (
-            <RelayItem
-              key={index}
-              relay={relay}
-              onRemove={() => handleRemoveExtraRelay(relay)}
-            />
-          ))}
-        </div>
-
-        <div className="flex gap-2 w-full">
-          <Input
-            type="text"
-            placeholder="wss://relay.example.com"
-            value={newExtraRelay}
-            onChange={(e) => setNewExtraRelay(e.target.value)}
-            onKeyDown={(e) => handleKeyPress(e, "extra")}
-            className="flex-1"
-          />
-          <Button
-            onClick={handleAddExtraRelay}
-            disabled={!newExtraRelay.trim()}
-          >
-            Add
-          </Button>
-        </div>
-      </div>
+      <LookupRelaysSection />
+      <OutboxRelaysSection />
+      <InboxRelaysSection />
+      <ExtraRelaysSection />
     </div>
   );
 }

@@ -12,7 +12,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   SidebarInput,
   SidebarInset,
-  SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { contacts$ } from "@/lib/accounts";
@@ -20,8 +19,8 @@ import { npubEncode } from "applesauce-core/helpers/pointers";
 import { use$ } from "applesauce-react/hooks";
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
-import { profileSearch } from "../lib/search";
 import { useDebounce } from "../hooks/use-debounce";
+import { profileSearch } from "../lib/search";
 
 function ContactItem({ pubkey }: { pubkey: string }) {
   const npub = npubEncode(pubkey);
@@ -64,13 +63,7 @@ export default function ContactsPage() {
   }, [contacts, debouncedQuery]);
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "400px",
-        } as React.CSSProperties
-      }
-    >
+    <>
       <AppSidebar title="Contacts">
         <div className="flex flex-col">
           <div className="p-2 border-b">
@@ -103,7 +96,9 @@ export default function ContactsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Home</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
@@ -116,6 +111,6 @@ export default function ContactsPage() {
         {/* Contact detail sub-pages */}
         <Outlet />
       </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }

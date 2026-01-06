@@ -92,7 +92,7 @@ export default function SettingsAccountsPage() {
   };
 
   return (
-    <div className="w-full max-w-2xl space-y-8 p-4">
+    <div className="w-full max-w-4xl space-y-8 p-4">
       <div className="space-y-4">
         <div>
           <h2 className="text-2xl font-semibold">Accounts</h2>

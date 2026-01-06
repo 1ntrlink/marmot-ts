@@ -1,12 +1,15 @@
 import { AccountManager, type SerializedAccount } from "applesauce-accounts";
 import { registerCommonAccountTypes } from "applesauce-accounts/accounts";
+import { ActionRunner } from "applesauce-actions";
 import { castUser } from "applesauce-common/casts/user";
 import { chainable } from "applesauce-common/observable/chainable";
-import { safeParse } from "applesauce-core/helpers";
+import { EventFactory } from "applesauce-core";
+import { relaySet, safeParse } from "applesauce-core/helpers";
 import { NostrConnectSigner } from "applesauce-signers";
 import { getKeyPackageRelayList, KEY_PACKAGE_RELAY_LIST_KIND } from "marmot-ts";
 import { combineLatest, map, of, switchMap } from "rxjs";
 import { eventStore, pool } from "./nostr";
+import { extraRelays$ } from "./settings";
 
 // create an account manager instance
 const accounts = new AccountManager();
@@ -48,6 +51,12 @@ export const user$ = chainable(
   accounts.active$.pipe(
     map((account) => account && castUser(account.pubkey, eventStore)),
   ),
+);
+
+// Create an event factory for the current active account
+export const factory = new EventFactory({ signer: accounts.signer });
+export const actions = new ActionRunner(eventStore, factory, (event, relays) =>
+  pool.publish(relaySet(relays, extraRelays$.value), event),
 );
 
 /** An observable of the current account's mailboxes */

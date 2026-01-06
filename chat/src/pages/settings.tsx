@@ -1,5 +1,3 @@
-import { Network, User, Users } from "lucide-react";
-import { Link, Outlet, useLocation } from "react-router";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -15,25 +13,31 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { KeyIcon, Network, User, Users } from "lucide-react";
+import { Link, Outlet, useLocation } from "react-router";
 
 const settingsNavItems = [
+  {
+    title: "Accounts",
+    url: "/settings/accounts",
+    icon: Users,
+  },
   {
     title: "Account",
     url: "/settings/account",
     icon: User,
   },
   {
+    title: "Marmot",
+    url: "/settings/marmot",
+    icon: KeyIcon,
+  },
+  {
     title: "Relays",
     url: "/settings/relays",
     icon: Network,
-  },
-  {
-    title: "Accounts",
-    url: "/settings/accounts",
-    icon: Users,
   },
 ];
 
@@ -46,13 +50,7 @@ export default function SettingsPage() {
   )?.title;
 
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "400px",
-        } as React.CSSProperties
-      }
-    >
+    <>
       <AppSidebar title="Settings">
         <SidebarMenu>
           {settingsNavItems.map((item) => {
@@ -84,7 +82,9 @@ export default function SettingsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Home</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
@@ -105,6 +105,6 @@ export default function SettingsPage() {
         {/* Settings sub-pages */}
         <Outlet />
       </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }

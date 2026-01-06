@@ -8,24 +8,15 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import { Link } from "react-router";
 import { ComponentExample } from "../components/component-example";
 import { Label } from "../components/ui/label";
 import { Switch } from "../components/ui/switch";
 
 export default function GroupsPage() {
   return (
-    <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "400px",
-        } as React.CSSProperties
-      }
-    >
+    <>
       <AppSidebar
         title="Groups"
         actions={
@@ -45,7 +36,9 @@ export default function GroupsPage() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/">Home</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link to="/">Home</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
@@ -58,6 +51,6 @@ export default function GroupsPage() {
         {/* Page */}
         <ComponentExample />
       </SidebarInset>
-    </SidebarProvider>
+    </>
   );
 }

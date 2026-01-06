@@ -20,6 +20,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.0.1
         version: 2.0.1
+      applesauce-actions:
+        specifier: ^5.0.0
+        version: 5.0.0(typescript@5.9.3)
       applesauce-common:
         specifier: ^5.0.0
         version: 5.0.0(typescript@5.9.3)
@@ -602,6 +605,9 @@ packages:
   ansi-styles@6.2.3:
     resolution: {integrity: sha512-4Dj6M28JB+oAH8kFkTLUo+a2jwOFkuqb3yucU0CANcRRUbxS0cP0nZYCGjcc3BNXwRIsUVmDGgzawme7zvJHvg==}
     engines: {node: '>=12'}
+
+  applesauce-actions@5.0.0:
+    resolution: {integrity: sha512-Lw9x3P3+p9udmA9BvAssJDasDr+eIXq22SBwS3D6kt+3TOnBmJqONR3ru6K3j5S5MflYsiiy66b4TcATrBOXgQ==}
 
   applesauce-common@5.0.0:
     resolution: {integrity: sha512-97ezzvy13yulozQDfjioW5MMnejPRr2ZrCqzJDbZm28elslS0x/s6rFh+NoHQFvStYuxgHOa3BIcv/E2qNhPqg==}
@@ -1378,6 +1384,15 @@ snapshots:
       color-convert: 2.0.1
 
   ansi-styles@6.2.3: {}
+
+  applesauce-actions@5.0.0(typescript@5.9.3):
+    dependencies:
+      applesauce-common: 5.0.0(typescript@5.9.3)
+      applesauce-core: 5.0.0(typescript@5.9.3)
+      rxjs: 7.8.2
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   applesauce-common@5.0.0(typescript@5.9.3):
     dependencies:
