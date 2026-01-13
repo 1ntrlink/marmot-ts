@@ -5,19 +5,24 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Package, UsersIcon } from "lucide-react";
+import { Package, UsersIcon, Rss } from "lucide-react";
 import { Link, Outlet, useLocation } from "react-router";
 
 const toolsNavItems = [
   {
-    title: "Key Package Decoder",
-    url: "/tools/key-package-decoder",
+    title: "Key Package Encoding",
+    url: "/tools/key-package-encoding",
     icon: Package,
   },
   {
-    title: "Group Metadata Encode/Decode",
-    url: "/tools/group-metadata-decoder",
+    title: "Group Metadata Encoding",
+    url: "/tools/group-metadata-encoding",
     icon: UsersIcon,
+  },
+  {
+    title: "Key Package Feed",
+    url: "/tools/key-package-feed",
+    icon: Rss,
   },
 ];
 

@@ -22,7 +22,9 @@ import MarmotSettingsPage from "./pages/settings/marmot";
 import SettingsRelaysPage from "./pages/settings/relays.tsx";
 import SignInPage from "./pages/signin.tsx";
 import ToolsPage from "./pages/tools";
-import KeyPackageDecoderPage from "./pages/tools/key-package-decoder";
+import KeyPackageDecoderPage from "./pages/tools/key-package-encoding.tsx";
+import GroupMetadataEncodingPage from "./pages/tools/group-metadata-encoding.tsx";
+import KeyPackageFeedPage from "./pages/tools/key-package-feed.tsx";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -49,9 +51,14 @@ createRoot(document.getElementById("root")!).render(
             </Route>
             <Route path="/tools" element={<ToolsPage />}>
               <Route
-                path="key-package-decoder"
+                path="key-package-encoding"
                 element={<KeyPackageDecoderPage />}
               />
+              <Route
+                path="group-metadata-encoding"
+                element={<GroupMetadataEncodingPage />}
+              />
+              <Route path="key-package-feed" element={<KeyPackageFeedPage />} />
             </Route>
             <Route path="/settings" element={<SettingsPage />}>
               <Route
