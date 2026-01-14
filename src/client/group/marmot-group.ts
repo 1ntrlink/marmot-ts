@@ -1,6 +1,6 @@
+import { Rumor } from "applesauce-common/helpers/gift-wrap";
+import { EventSigner } from "applesauce-core/event-factory";
 import { NostrEvent } from "applesauce-core/helpers/event";
-import { Rumor } from "applesauce-core/helpers";
-import { EventSigner } from "applesauce-factory";
 import {
   CiphersuiteImpl,
   ClientState,
@@ -43,15 +43,12 @@ import { getKeyPackage } from "../../core/key-package.js";
 import { GroupStore } from "../../store/group-store.js";
 import { createGiftWrap, hasAck } from "../../utils/index.js";
 import {
+  MaxRetriesExceededError,
   NoGroupRelaysError,
   NoMarmotGroupDataError,
   NoRelayReceivedEventError,
 } from "../errors.js";
-import {
-  NostrNetworkInterface as NostrNetworkInterface,
-  PublishResponse,
-} from "../nostr-interface.js";
-import { CreateCommitOptions } from "ts-mls/createCommit.js";
+import { NostrNetworkInterface, PublishResponse } from "../nostr-interface.js";
 
 export type ProposalContext = {
   state: ClientState;
