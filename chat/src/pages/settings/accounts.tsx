@@ -16,6 +16,8 @@ import { npubEncode } from "applesauce-core/helpers/pointers";
 import { use$ } from "applesauce-react/hooks";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
+import { PageBody } from "../../components/page-body";
+import { PageHeader } from "../../components/page-header";
 
 function AccountItem({
   account,
@@ -92,14 +94,15 @@ export default function SettingsAccountsPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl space-y-8 p-4">
-      <div className="space-y-4">
-        <div>
-          <h2 className="text-2xl font-semibold">Accounts</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage your accounts. Switch between accounts or add new ones.
-          </p>
-        </div>
+    <>
+      <PageHeader
+        items={[
+          { label: "Home", to: "/" },
+          { label: "Settings", to: "/settings" },
+          { label: "Accounts" },
+        ]}
+      />
+      <PageBody>
         <div className="space-y-2">
           {accounts.length === 0 ? (
             <div className="text-muted-foreground text-sm text-center py-8">
@@ -130,7 +133,7 @@ export default function SettingsAccountsPage() {
             </Link>
           </Button>
         </div>
-      </div>
+      </PageBody>
 
       <AlertDialog
         open={removeAccountId !== null}
@@ -155,6 +158,6 @@ export default function SettingsAccountsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   );
 }

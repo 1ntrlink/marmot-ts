@@ -1,4 +1,3 @@
-import { useState } from "react";
 import QRImage from "./qr-image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./ui/dialog";
 

@@ -1,28 +1,20 @@
-import { mapEventsToTimeline } from "applesauce-core";
+import { mapEventsToStore, mapEventsToTimeline } from "applesauce-core";
 import { kinds, relaySet } from "applesauce-core/helpers";
 import { npubEncode } from "applesauce-core/helpers/pointers";
 import { use$ } from "applesauce-react/hooks";
 import { onlyEvents } from "applesauce-relay";
 import { useMemo } from "react";
 import { Link } from "react-router";
-import {
-  combineLatest,
-  distinct,
-  EMPTY,
-  map,
-  ReplaySubject,
-  share,
-  switchMap,
-  timer,
-} from "rxjs";
 
 import { UserAvatar, UserName } from "@/components/nostr-user";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { user$ } from "@/lib/accounts";
-import { pool } from "@/lib/nostr";
+import { withSignIn } from "@/components/with-signIn";
+import accounts, { user$ } from "@/lib/accounts";
+import { eventStore, pool } from "@/lib/nostr";
 import { extraRelays$ } from "@/lib/settings";
 import { formatTimeAgo } from "@/lib/time";
+import { SubscriptionStatusButton } from "../../components/subscription-status-button";
 
 function FollowerItem({
   pubkey,
@@ -50,44 +42,40 @@ function FollowerItem({
   );
 }
 
-// Complicated observable for subscribing to the other users show are following
-const recentFollows$ = user$.pipe(
-  switchMap((user) =>
-    user
-      ? pool
-          .subscription(
-            combineLatest([user$.inboxes$, extraRelays$]).pipe(
-              map((all) => relaySet(...all)),
-            ),
-            { kinds: [kinds.Contacts], "#p": [user.pubkey], limit: 5 },
-          )
-          .pipe(
-            onlyEvents(),
-            // Ignore duplicate events with the same pubkey
-            distinct((e) => e.pubkey),
-            mapEventsToTimeline(),
-          )
-      : EMPTY,
-  ),
-  share({
-    // Save the last value
-    connector: () => new ReplaySubject(1),
-    // Reset after 60 seconds
-    resetOnRefCountZero: () => timer(60 * 1000),
-  }),
-  // Hack to make react re-render
-  map((arr) => [...arr]),
-);
+function ContactsIndexPage() {
+  const extraRelays = use$(extraRelays$);
+  const inboxes = use$(user$.inboxes$);
+  const relays = useMemo(
+    () => relaySet(inboxes, extraRelays),
+    [inboxes, extraRelays],
+  );
 
-export default function ContactsIndexPage() {
-  const recent = use$(recentFollows$);
+  const account = use$(accounts.active$);
+  const recent = use$(
+    () =>
+      pool
+        .subscription(relays, {
+          kinds: [kinds.Contacts],
+          "#p": [account!.pubkey],
+          limit: 5,
+        })
+        .pipe(
+          onlyEvents(),
+          mapEventsToStore(eventStore),
+          mapEventsToTimeline(),
+        ),
+    [relays, account!.pubkey],
+  );
 
   return (
     <>
       <PageHeader items={[{ label: "Home", to: "/" }, { label: "Contacts" }]} />
       <PageBody center>
         <section>
-          <h2 className="text-xl font-semibold mb-4">Recent Followers</h2>
+          <div className="flex gap-2 items-start justify-between">
+            <h2 className="text-xl font-semibold mb-4">Recent Followers</h2>
+            <SubscriptionStatusButton relays={relays} events={recent} />
+          </div>
           {recent && recent.length > 0 ? (
             <div className="space-y-2">
               {recent.map((event) => (
@@ -108,3 +96,5 @@ export default function ContactsIndexPage() {
     </>
   );
 }
+
+export default withSignIn(ContactsIndexPage);

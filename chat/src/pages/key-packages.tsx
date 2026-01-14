@@ -21,7 +21,7 @@ import { default as accounts, keyPackageRelays$, user$ } from "@/lib/accounts";
 import { eventStore, pool } from "@/lib/nostr";
 import { extraRelays$ } from "@/lib/settings";
 import { formatTimeAgo } from "@/lib/time";
-import { RelayConnectionStatusButton } from "@/components/relay-connection-status-button";
+import { SubscriptionStatusButton } from "@/components/subscription-status-button";
 
 function KeyPackageItem({ event }: { event: NostrEvent }) {
   const location = useLocation();
@@ -101,7 +101,7 @@ function KeyPackagesPage() {
         title="Key Packages"
         actions={
           <div className="flex items-center gap-2">
-            <RelayConnectionStatusButton relays={readRelays$} />
+            <SubscriptionStatusButton relays={readRelays$} />
             <Button asChild size="sm" variant="default">
               <Link to="/key-packages/create">
                 <Plus className="h-4 w-4 mr-1" />

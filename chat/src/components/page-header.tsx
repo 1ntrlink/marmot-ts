@@ -1,4 +1,4 @@
-import React from "react";
+import React, { ReactNode } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -18,9 +18,10 @@ export type BreadcrumbItemType = {
 
 interface PageHeaderProps {
   items: BreadcrumbItemType[];
+  actions?: ReactNode;
 }
 
-export function PageHeader({ items }: PageHeaderProps) {
+export function PageHeader({ items, actions }: PageHeaderProps) {
   return (
     <header className="bg-background sticky top-0 flex shrink-0 items-center gap-2 border-b p-4">
       <SidebarTrigger className="-ml-1" />
@@ -55,6 +56,7 @@ export function PageHeader({ items }: PageHeaderProps) {
           })}
         </BreadcrumbList>
       </Breadcrumb>
+      {actions && <div className="ml-auto">{actions}</div>}
     </header>
   );
 }

@@ -1,5 +1,4 @@
 import { AppSidebar } from "@/components/app-sidebar";
-import { PageHeader } from "@/components/page-header";
 import {
   SidebarInset,
   SidebarMenu,
@@ -64,15 +63,6 @@ export default function SettingsPage() {
         </SidebarMenu>
       </AppSidebar>
       <SidebarInset>
-        <PageHeader
-          items={[
-            { label: "Home", to: "/" },
-            { label: "Settings", to: "/settings" },
-            ...(activeSubNavItem ? [{ label: activeSubNavItem }] : []),
-          ]}
-        />
-
-        {/* Settings sub-pages */}
         <Outlet />
       </SidebarInset>
     </>

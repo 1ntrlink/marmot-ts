@@ -1,5 +1,5 @@
 import { mapEventsToTimeline } from "applesauce-core";
-import { relaySet, type NostrEvent } from "applesauce-core/helpers";
+import { type NostrEvent } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
 import { onlyEvents } from "applesauce-relay";
 import {
@@ -8,58 +8,77 @@ import {
   getKeyPackageClient,
 } from "marmot-ts";
 import { useState } from "react";
-import { combineLatest, of } from "rxjs";
-import { map, switchMap } from "rxjs/operators";
+import { of } from "rxjs";
+import { map } from "rxjs/operators";
 
 import CipherSuiteBadge from "@/components/cipher-suite-badge";
+import KeyPackageDetailsModal from "@/components/key-package/details-modal";
 import { UserAvatar, UserName } from "@/components/nostr-user";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { pool } from "@/lib/nostr";
-import { extraRelays$, relayConfig$ } from "@/lib/settings";
+import { relayConfig$ } from "@/lib/settings";
 import { formatTimeAgo } from "@/lib/time";
 
 function KeyPackageItem({ event }: { event: NostrEvent }) {
+  const [modalOpen, setModalOpen] = useState(false);
   const client = getKeyPackageClient(event);
   const cipherSuiteId = getKeyPackageCipherSuiteId(event);
   const timeAgo = formatTimeAgo(event.created_at);
 
   return (
-    <Card>
-      <CardContent>
-        <div className="flex items-start gap-3">
-          <UserAvatar pubkey={event.pubkey} size="sm" />
-          <div className="flex-1 min-w-0 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold">
-                <UserName pubkey={event.pubkey} />
-              </span>
-              <span className="text-xs text-muted-foreground">{timeAgo}</span>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              {cipherSuiteId !== undefined ? (
-                <CipherSuiteBadge cipherSuite={cipherSuiteId} />
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  Unknown cipher suite
+    <>
+      <Card>
+        <CardContent>
+          <div className="flex items-start gap-3">
+            <UserAvatar pubkey={event.pubkey} size="sm" />
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold">
+                  <UserName pubkey={event.pubkey} />
                 </span>
-              )}
-              {client?.name && (
-                <span className="text-xs text-muted-foreground">
-                  Client: {client.name}
-                </span>
-              )}
+                <span className="text-xs text-muted-foreground">{timeAgo}</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {cipherSuiteId !== undefined ? (
+                  <CipherSuiteBadge cipherSuite={cipherSuiteId} />
+                ) : (
+                  <span className="text-xs text-muted-foreground">
+                    Unknown cipher suite
+                  </span>
+                )}
+                {client?.name && (
+                  <span className="text-xs text-muted-foreground">
+                    Client: {client.name}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-xs text-muted-foreground break-all font-mono">
+                  {event.id}
+                </code>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setModalOpen(true)}
+                >
+                  Details
+                </Button>
+              </div>
             </div>
-            <code className="text-xs text-muted-foreground break-all font-mono">
-              {event.id}
-            </code>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+      <KeyPackageDetailsModal
+        event={event}
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+      />
+    </>
   );
 }
 
@@ -72,26 +91,19 @@ export default function KeyPackageFeedPage() {
   // Subscribe to key package events from relay (always include extra relays)
   const events = use$(() => {
     // Return empty observable if selectedRelay is empty to avoid invalid relay requests
-    if (!selectedRelay) {
-      return of([]);
-    }
+    if (!selectedRelay) return of([]);
 
-    return combineLatest([of(selectedRelay), extraRelays$]).pipe(
-      switchMap(([relay, extraRelays]) => {
-        // Combine selected relay with extra relays
-        const relaysToUse = relaySet([relay], extraRelays);
-        return pool
-          .subscription(relaysToUse, {
-            kinds: [KEY_PACKAGE_KIND],
-            limit: 100,
-          })
-          .pipe(
-            onlyEvents(),
-            mapEventsToTimeline(),
-            map((arr) => [...arr]),
-          );
-      }),
-    );
+    return pool
+      .relay(selectedRelay)
+      .subscription({
+        kinds: [KEY_PACKAGE_KIND],
+        limit: 50,
+      })
+      .pipe(
+        onlyEvents(),
+        mapEventsToTimeline(),
+        map((arr) => [...arr]),
+      );
   }, [selectedRelay]);
 
   return (

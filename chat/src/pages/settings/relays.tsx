@@ -15,6 +15,8 @@ import {
 import { use$ } from "applesauce-react/hooks";
 import { Loader2Icon, WifiIcon, WifiOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
+import { PageBody } from "../../components/page-body";
+import { PageHeader } from "../../components/page-header";
 import { actions, user$ } from "../../lib/accounts";
 import { pool } from "../../lib/nostr";
 
@@ -267,11 +269,20 @@ function ExtraRelaysSection() {
 
 export default function SettingsRelaysPage() {
   return (
-    <div className="w-full max-w-2xl space-y-8 p-4">
-      <LookupRelaysSection />
-      <OutboxRelaysSection />
-      <InboxRelaysSection />
-      <ExtraRelaysSection />
-    </div>
+    <>
+      <PageHeader
+        items={[
+          { label: "Home", to: "/" },
+          { label: "Settings", to: "/settings" },
+          { label: "Relays" },
+        ]}
+      />
+      <PageBody>
+        <LookupRelaysSection />
+        <OutboxRelaysSection />
+        <InboxRelaysSection />
+        <ExtraRelaysSection />
+      </PageBody>
+    </>
   );
 }

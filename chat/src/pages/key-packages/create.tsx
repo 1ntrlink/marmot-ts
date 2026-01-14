@@ -13,7 +13,7 @@ import {
 import { withSignIn } from "@/components/with-signIn";
 import accountManager, { keyPackageRelays$, user$ } from "@/lib/accounts";
 import { keyPackageStore$ } from "@/lib/key-package-store";
-import { pool } from "@/lib/nostr";
+import { eventStore, pool } from "@/lib/nostr";
 import { relaySet } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
 import { Loader2, XCircle } from "lucide-react";
@@ -98,15 +98,12 @@ function CreateKeyPackagePage() {
       console.log("Signed event:", signedEvent);
 
       // Publish to both key package relays and outboxes
-      console.log("Publishing to relays:", publishRelays);
-      for (const relay of publishRelays) {
-        try {
-          await pool.publish([relay], signedEvent);
-          console.log("Published to", relay);
-        } catch (err) {
-          console.error("Failed to publish to", relay, err);
-        }
-      }
+      console.log("Publishing to relays:", publishRelays.join(", "));
+      await pool.publish(publishRelays, signedEvent);
+      console.log("Published to", publishRelays.join(", "));
+
+      // Store the signed event in the event store
+      eventStore.add(signedEvent);
 
       // Store the key package locally only after successful publication
       if (keyPackageStore) {

@@ -2,6 +2,7 @@ import { use$ } from "applesauce-react/hooks";
 import type { Relay } from "applesauce-relay";
 import { LockIcon, WifiHighIcon, WifiOffIcon } from "lucide-react";
 import { combineLatest, isObservable, map, of, type Observable } from "rxjs";
+import { isFromRelay, type NostrEvent } from "applesauce-core/helpers";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +12,13 @@ import {
 } from "@/components/ui/popover";
 import { pool } from "@/lib/nostr";
 
-function RelayStatus({ relay }: { relay: Relay }) {
+function RelayStatus({
+  relay,
+  events,
+}: {
+  relay: Relay;
+  events?: NostrEvent[];
+}) {
   const icon = use$(relay.icon$);
   const connected = use$(relay.connected$);
   const authenticated = use$(relay.authenticated$);
@@ -25,7 +32,10 @@ function RelayStatus({ relay }: { relay: Relay }) {
         }`}
         title={connected ? "Connected" : "Disconnected"}
       />
-      <code className="flex-1 text-xs font-mono truncate">{relay.url}</code>
+      <code className="flex-1 text-xs font-mono truncate select-all">
+        {relay.url}
+      </code>
+      {events && events.length > 0 && <span>({events.length})</span>}
       {authenticated && (
         <span title="Authenticated">
           <LockIcon className="w-3 h-3 text-green-500 shrink-0" />
@@ -35,10 +45,12 @@ function RelayStatus({ relay }: { relay: Relay }) {
   );
 }
 
-export function RelayConnectionStatusButton({
+export function SubscriptionStatusButton({
   relays,
+  events,
 }: {
   relays: string[] | Observable<string[]>;
+  events?: NostrEvent[];
 }) {
   const instances = use$(
     () =>
@@ -81,7 +93,15 @@ export function RelayConnectionStatusButton({
             </p>
           ) : (
             instances.map((relay) => (
-              <RelayStatus key={relay.url} relay={relay} />
+              <RelayStatus
+                key={relay.url}
+                relay={relay}
+                events={
+                  events
+                    ? events.filter((e) => isFromRelay(e, relay.url))
+                    : undefined
+                }
+              />
             ))
           )}
         </div>

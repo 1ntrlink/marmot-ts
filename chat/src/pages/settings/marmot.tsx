@@ -145,7 +145,7 @@ function KeyPackageRelaysSection() {
             relay list.
           </div>
         ) : (
-          keyPackageRelaysList.map((relay, index) => (
+          keyPackageRelaysList.map((relay) => (
             <RelayItem
               key={relay}
               relay={relay}
