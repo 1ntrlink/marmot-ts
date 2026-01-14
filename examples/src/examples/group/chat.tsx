@@ -375,6 +375,7 @@ function useGroupSubscription(
   const processEventsRef = useRef<(events: NostrEvent[]) => Promise<void>>(
     async (_events: NostrEvent[]) => {},
   );
+  const seenEventIdsRef = useRef<Set<string>>(new Set());
 
   // Set up message processing function
   useEffect(() => {
@@ -383,9 +384,18 @@ function useGroupSubscription(
     processEventsRef.current = async (events: NostrEvent[]) => {
       if (events.length === 0) return;
 
+      // Deduplicate events before processing
+      const newEvents = events.filter(
+        (e) => !seenEventIdsRef.current.has(e.id),
+      );
+      if (newEvents.length === 0) return;
+
+      // Add new event IDs to seen set
+      newEvents.forEach((e) => seenEventIdsRef.current.add(e.id));
+
       try {
         const newMessages: Rumor[] = [];
-        for await (const result of group.ingest(events)) {
+        for await (const result of group.ingest(newEvents)) {
           if (result.kind === "applicationMessage") {
             try {
               // Deserialize the application data to get the rumor
@@ -416,6 +426,8 @@ function useGroupSubscription(
         subscriptionRef.current.unsubscribe();
         subscriptionRef.current = null;
       }
+      // Clear seen events when group changes
+      seenEventIdsRef.current.clear();
       return;
     }
 
@@ -432,56 +444,29 @@ function useGroupSubscription(
       "#h": [nostrGroupIdHex],
     };
 
-    // Local state for this subscription
-    let localEoseReceived = false;
-    const localBatchedEvents: NostrEvent[] = [];
-
     // Set up subscription using the pool directly
     const observable = pool.subscription(relays, filters);
     const subscription = observable.subscribe({
       next: (value: any) => {
         // Handle both single events and arrays
         const events: NostrEvent[] = Array.isArray(value) ? value : [value];
-
-        if (localEoseReceived) {
-          // After EOSE, process events immediately
-          processEventsRef.current?.(events);
-        } else {
-          // Before EOSE, batch events locally
-          localBatchedEvents.push(...events);
-        }
+        // Process events immediately as they arrive (real-time only)
+        processEventsRef.current?.(events);
       },
       error: (err) => {
         console.error("Subscription error:", err);
       },
       complete: () => {
-        // Observable completion can be treated as EOSE
-        if (!localEoseReceived) {
-          localEoseReceived = true;
-          // Process batched events
-          if (localBatchedEvents.length > 0) {
-            processEventsRef.current?.(localBatchedEvents);
-          }
-        }
+        // No-op for real-time subscription
+        console.debug("Subscription completed");
       },
     });
 
     subscriptionRef.current = subscription;
 
-    // Set a timeout to treat as EOSE after initial batch period
-    const eoseTimeout = setTimeout(() => {
-      if (!localEoseReceived) {
-        localEoseReceived = true;
-        // Process batched events
-        if (localBatchedEvents.length > 0) {
-          processEventsRef.current?.(localBatchedEvents);
-        }
-      }
-    }, 2000); // 2 second timeout for initial batch
-
     return () => {
       subscription.unsubscribe();
-      clearTimeout(eoseTimeout);
+      seenEventIdsRef.current.clear();
     };
   }, [group, account]);
 }
@@ -607,7 +592,11 @@ function Chat() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Group Chat</h1>
         <p className="text-base-content/70">
-          Select a group and start chatting with members
+          This page assumes you already joined the group. Use the Create,
+          Add-member, and Join examples for lifecycle steps.
+        </p>
+        <p className="text-base-content/70">
+          Select a group and start chatting with members in real-time.
         </p>
       </div>
 

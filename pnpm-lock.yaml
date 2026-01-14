@@ -35,6 +35,9 @@ importers:
       "@types/node":
         specifier: ^24.10.8
         version: 24.10.8
+      applesauce-accounts:
+        specifier: ^5.0.0
+        version: 5.0.0(typescript@5.9.3)
       husky:
         specifier: ^9.1.7
         version: 9.1.7

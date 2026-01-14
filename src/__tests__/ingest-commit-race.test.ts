@@ -27,7 +27,7 @@ import type { NostrNetworkInterface } from "../client/nostr-interface.js";
 import { EventSigner } from "applesauce-core";
 import { Rumor } from "applesauce-common/helpers";
 
-class MemoryBackend<T> implements KeyValueStoreBackend<T> {
+export class MemoryBackend<T> implements KeyValueStoreBackend<T> {
   private map = new Map<string, T>();
 
   async getItem(key: string): Promise<T | null> {

@@ -1,11 +1,6 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { mapEventsToTimeline } from "applesauce-core";
-import {
-  NostrEvent,
-  relaySet,
-  Rumor,
-  unlockGiftWrap,
-} from "applesauce-core/helpers";
+import { NostrEvent, relaySet } from "applesauce-core/helpers";
 import { BehaviorSubject, of, from } from "rxjs";
 import { map } from "rxjs/operators";
 import { getMemberCount } from "../../../../src/core/client-state";
@@ -17,6 +12,7 @@ import accounts from "../../lib/accounts";
 import { marmotClient$ } from "../../lib/marmot-client";
 import { pool } from "../../lib/nostr";
 import { extraRelays$ } from "../../lib/settings";
+import { Rumor, unlockGiftWrap } from "applesauce-common/helpers";
 
 // ============================================================================
 // Types
