@@ -1,13 +1,14 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { UserAvatar, UserName } from "@/components/nostr-user";
 import { SidebarInput, SidebarInset } from "@/components/ui/sidebar";
-import { contacts$ } from "@/lib/accounts";
+import { user$ } from "@/lib/accounts";
 import { npubEncode } from "applesauce-core/helpers/pointers";
 import { use$ } from "applesauce-react/hooks";
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import { useDebounce } from "../hooks/use-debounce";
 import { profileSearch } from "../lib/search";
+import { eventLoader } from "../lib/nostr";
 
 function ContactItem({ pubkey }: { pubkey: string }) {
   const npub = npubEncode(pubkey);
@@ -35,8 +36,24 @@ function ContactItem({ pubkey }: { pubkey: string }) {
 }
 
 export default function ContactsPage() {
-  const contacts = use$(contacts$);
+  const contacts = use$(user$.contacts$);
   const [query, setQuery] = useState("");
+
+  // always load the latest contacts
+  const user = use$(user$);
+  const outboxes = use$(user$.outboxes$);
+  use$(
+    () =>
+      user &&
+      eventLoader({
+        kind: 3,
+        pubkey: user.pubkey,
+        // @ts-ignore
+        cache: false,
+        relays: outboxes,
+      }),
+    [user, outboxes],
+  );
 
   const debouncedQuery = useDebounce(query, 500);
 

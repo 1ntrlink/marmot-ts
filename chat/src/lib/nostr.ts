@@ -37,7 +37,7 @@ export const cacheRequest: CacheRequest = (filters) =>
   window.nostrdb.filters(filters);
 
 // Attach loaders to event store
-createEventLoaderForStore(eventStore, pool, {
+export const eventLoader = createEventLoaderForStore(eventStore, pool, {
   cacheRequest,
   lookupRelays: lookupRelays$,
   extraRelays: extraRelays$,
