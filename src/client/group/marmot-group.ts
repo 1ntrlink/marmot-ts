@@ -39,13 +39,13 @@ import { isPrivateMessage } from "../../core/message.js";
 import { MarmotGroupData } from "../../core/protocol.js";
 import { createWelcomeRumor } from "../../core/welcome.js";
 import { proposeInviteUser } from "./proposals/invite-user.js";
+import { getKeyPackage } from "../../core/key-package.js";
 import { GroupStore } from "../../store/group-store.js";
 import { createGiftWrap, hasAck } from "../../utils/index.js";
 import {
   NoGroupRelaysError,
   NoMarmotGroupDataError,
   NoRelayReceivedEventError,
-  MaxRetriesExceededError,
 } from "../errors.js";
 import {
   NostrNetworkInterface as NostrNetworkInterface,
@@ -541,7 +541,18 @@ export class MarmotGroup {
     // Validate the event is a KeyPackage event (kind 443)
     if (keyPackageEvent.kind !== 443) {
       throw new Error(
-        `Expected KeyPackage event kind 443, got ${keyPackageEvent.kind}`,
+        `inviteByKeyPackageEvent: Expected KeyPackage event kind 443, got ${keyPackageEvent.kind}`,
+      );
+    }
+
+    // Validate that the credential identity matches the event pubkey
+    const keyPackage = getKeyPackage(keyPackageEvent);
+    const credentialIdentity = getCredentialPubkey(
+      keyPackage.leafNode.credential,
+    );
+    if (credentialIdentity !== keyPackageEvent.pubkey) {
+      throw new Error(
+        `inviteByKeyPackageEvent: Credential identity ${credentialIdentity} does not match event pubkey ${keyPackageEvent.pubkey}`,
       );
     }
 

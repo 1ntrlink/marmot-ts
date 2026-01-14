@@ -6,7 +6,7 @@ import {
   Rumor,
   unlockGiftWrap,
 } from "applesauce-core/helpers";
-import { BehaviorSubject, combineLatest, from, of, switchMap } from "rxjs";
+import { BehaviorSubject, of, from } from "rxjs";
 import { map } from "rxjs/operators";
 import { getMemberCount } from "../../../../src/core/client-state";
 import { extractMarmotGroupData } from "../../../../src/core/client-state";
@@ -264,45 +264,36 @@ export default withSignIn(function JoinGroup() {
 
   // Subscribe to gift-wrapped events (kind 1059) for the current user
   const giftWraps =
-    useObservableMemo(
-      () =>
-        combineLatest([extraRelays$]).pipe(
-          switchMap(([extraRelays]) => {
-            if (!account) return of([]);
+    useObservableMemo(() => {
+      if (!account) return of([]);
 
-            const relays = relaySet([], extraRelays);
+      const relays = relaySet([], extraRelays$.value);
 
-            return pool
-              .request(relays, {
-                kinds: [1059], // NIP-59 gift wrap
-                limit: 50,
-              })
-              .pipe(
-                mapEventsToTimeline(),
-                map((arr) => [...arr]),
-              );
-          }),
-        ),
-      [],
-    ) ?? [];
+      return pool
+        .request(relays, {
+          kinds: [1059], // NIP-59 gift wrap
+          limit: 50,
+        })
+        .pipe(
+          mapEventsToTimeline(),
+          map((arr) => [...arr]),
+        );
+    }, [account]) ?? [];
 
   // Process gift wraps to extract Welcome messages
   const welcomeMessages =
     useObservableMemo(
       () =>
-        combineLatest([
-          from(Promise.resolve(giftWraps)),
-          from(Promise.resolve(account)),
-        ]).pipe(
-          switchMap(async ([giftWrapEvents, acc]) => {
-            if (!acc) return [];
+        from(
+          (async () => {
+            if (!account || !Array.isArray(giftWraps)) return [];
 
             const welcomes: WelcomeMessage[] = [];
 
-            for (const giftWrap of giftWrapEvents) {
+            for (const giftWrap of giftWraps) {
               try {
                 // Unwrap the gift wrap to get the inner rumor
-                const rumor = await unlockGiftWrap(giftWrap, acc.signer);
+                const rumor = await unlockGiftWrap(giftWrap, account.signer);
 
                 // Check if it's a Welcome message (kind 444)
                 if (rumor.kind === 444) {
@@ -337,9 +328,9 @@ export default withSignIn(function JoinGroup() {
 
             // Sort by timestamp, newest first
             return welcomes.sort((a, b) => b.timestamp - a.timestamp);
-          }),
+          })(),
         ),
-      [],
+      [giftWraps, account],
     ) ?? [];
 
   const selectedWelcome = useObservable(
@@ -372,6 +363,7 @@ export default withSignIn(function JoinGroup() {
       // Join the group from the Welcome message
       const group = await client.joinGroupFromWelcome({
         welcomeRumor: selectedWelcome.welcomeRumor,
+        keyPackageEventId: selectedWelcome.keyPackageEventId,
       });
 
       const marmotData = extractMarmotGroupData(group.state);
