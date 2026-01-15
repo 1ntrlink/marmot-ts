@@ -10,6 +10,8 @@ import {
   shareReplay,
   startWith,
   switchMap,
+  withLatestFrom,
+  filter,
 } from "rxjs";
 import { MarmotClient } from "../../../src";
 import { MarmotGroup } from "../../../src/client/group/marmot-group";
@@ -52,6 +54,9 @@ const networkInterface: NostrNetworkInterface = {
 // Global subscription manager instance
 let subscriptionManager: GroupSubscriptionManager | null = null;
 
+// Track when subscription manager is fully initialized
+let isSubscriptionManagerReady = false;
+
 // Export the subscription manager for components to register callbacks
 export function getSubscriptionManager(): GroupSubscriptionManager | null {
   return subscriptionManager;
@@ -85,6 +90,7 @@ marmotClient$.subscribe(async (client) => {
       subscriptionManager.stop();
       subscriptionManager = null;
     }
+    isSubscriptionManagerReady = false;
     return;
   }
 
@@ -94,21 +100,34 @@ marmotClient$.subscribe(async (client) => {
     subscriptionManager = new GroupSubscriptionManager(client);
     try {
       await subscriptionManager.start();
+      isSubscriptionManagerReady = true;
+      console.log("Subscription manager started successfully");
     } catch (err) {
       console.error("Failed to start subscription manager:", err);
       subscriptionManager = null;
+      isSubscriptionManagerReady = false;
     }
   }
 });
 
-// Reconcile subscriptions when group store changes
-groupStore$.subscribe((store) => {
-  if (subscriptionManager && store) {
-    subscriptionManager.reconcileSubscriptions().catch((err) => {
+// Reconcile subscriptions when group store changes, but only after manager is ready
+// Use withLatestFrom to get the latest marmotClient$ value and filter for ready state
+groupStore$
+  .pipe(
+    withLatestFrom(marmotClient$),
+    filter(([store, client]) => {
+      // Only proceed if store exists, client exists, and subscription manager is fully initialized
+      return Boolean(
+        store && client && isSubscriptionManagerReady && subscriptionManager,
+      );
+    }),
+  )
+  .subscribe(() => {
+    // At this point we know subscriptionManager is not null because of the filter
+    subscriptionManager!.reconcileSubscriptions().catch((err) => {
       console.error("Failed to reconcile subscriptions:", err);
     });
-  }
-});
+  });
 
 // Observable for the currently selected group
 // Derives the MarmotGroup from the selectedGroupId$ and marmotClient$
