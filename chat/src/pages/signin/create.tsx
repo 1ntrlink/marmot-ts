@@ -1,6 +1,7 @@
 import { PrivateKeyAccount } from "applesauce-accounts/accounts";
 import { setProfile } from "applesauce-core/operations/profile";
 import { useCallback, useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import {
   adjectives,
   animals,
@@ -30,7 +31,9 @@ interface PreviewUser {
   account: PrivateKeyAccount<any>;
 }
 
-export default function NewUser({ onSuccess }: NewUserProps) {
+export default function CreateUserTab({ onSuccess }: NewUserProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUser, setPreviewUser] = useState<PreviewUser | null>(null);
@@ -109,10 +112,14 @@ export default function NewUser({ onSuccess }: NewUserProps) {
       // Set it as the active account
       accountManager.setActive(account.id);
 
-      // Call success callback
-      onSuccess?.();
-
-      generateRandomUser();
+      // Call success callback or navigate
+      if (onSuccess) {
+        onSuccess();
+        generateRandomUser();
+      } else {
+        const from = (location.state as any)?.from ?? "/";
+        navigate(from);
+      }
     } catch (err) {
       console.error("Create user error:", err);
       setError(err instanceof Error ? err.message : "Failed to create user");

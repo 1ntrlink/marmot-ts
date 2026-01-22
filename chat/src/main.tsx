@@ -21,6 +21,11 @@ import SettingsAccountsPage from "./pages/settings/accounts.tsx";
 import MarmotSettingsPage from "./pages/settings/marmot";
 import SettingsRelaysPage from "./pages/settings/relays.tsx";
 import SignInPage from "./pages/signin.tsx";
+import SignInIndexPage from "./pages/signin/index.tsx";
+import SignInNewUserPage from "./pages/signin/create.tsx";
+import SignInExtensionPage from "./pages/signin/extension.tsx";
+import SignInBunkerPage from "./pages/signin/bunker.tsx";
+import SignInQRPage from "./pages/signin/connect-qr.tsx";
 import ToolsPage from "./pages/tools";
 import KeyPackageDecoderPage from "./pages/tools/key-package-encoding.tsx";
 import GroupMetadataEncodingPage from "./pages/tools/group-metadata-encoding.tsx";
@@ -44,7 +49,13 @@ createRoot(document.getElementById("root")!).render(
               <Route path="create" element={<CreateKeyPackagePage />} />
               <Route path=":id" element={<KeyPackageDetailPage />} />
             </Route>
-            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signin" element={<SignInPage />}>
+              <Route index element={<SignInIndexPage />} />
+              <Route path="new-user" element={<SignInNewUserPage />} />
+              <Route path="extension" element={<SignInExtensionPage />} />
+              <Route path="bunker" element={<SignInBunkerPage />} />
+              <Route path="qr" element={<SignInQRPage />} />
+            </Route>
             <Route path="/contacts" element={<ContactsPage />}>
               <Route path=":npub" element={<ContactDetailPage />} />
               <Route index element={<ContactsIndexPage />} />
