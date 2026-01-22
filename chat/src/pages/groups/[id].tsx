@@ -1,10 +1,3 @@
-import { PageHeader } from "@/components/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { withSignIn } from "@/components/with-signIn";
-import accountManager from "@/lib/accounts";
-import { marmotClient$ } from "@/lib/marmot-client";
 import { Rumor } from "applesauce-common/helpers/gift-wrap";
 import { use$ } from "applesauce-react/hooks";
 import { Loader2, XCircle } from "lucide-react";
@@ -13,6 +6,14 @@ import { getEventHash } from "nostr-tools";
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router";
 import { from, of, switchMap } from "rxjs";
+
+import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { withSignIn } from "@/components/with-signIn";
+import accountManager from "@/lib/accounts";
+import { marmotClient$ } from "@/lib/marmot-client";
 
 // ============================================================================
 // Component: MessageItem

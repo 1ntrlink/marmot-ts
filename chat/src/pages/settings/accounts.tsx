@@ -1,4 +1,11 @@
+import { npubEncode } from "applesauce-core/helpers/pointers";
+import { use$ } from "applesauce-react/hooks";
+import { useState } from "react";
+import { Link, useLocation } from "react-router";
+
 import { UserAvatar, UserName } from "@/components/nostr-user";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
 import QRButton from "@/components/qr-button";
 import {
   AlertDialog,
@@ -12,12 +19,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import accountManager from "@/lib/accounts";
-import { npubEncode } from "applesauce-core/helpers/pointers";
-import { use$ } from "applesauce-react/hooks";
-import { useState } from "react";
-import { Link, useLocation } from "react-router";
-import { PageBody } from "../../components/page-body";
-import { PageHeader } from "../../components/page-header";
 
 function AccountItem({
   account,

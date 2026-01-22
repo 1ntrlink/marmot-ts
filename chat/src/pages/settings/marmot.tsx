@@ -1,13 +1,3 @@
-import { EventStatusButton } from "@/components/event-status-button";
-import { PageBody } from "@/components/page-body";
-import { PageHeader } from "@/components/page-header";
-import accountManager, {
-  keyPackageRelays$,
-  mailboxes$,
-  user$,
-} from "@/lib/accounts";
-import { extraRelays$, lookupRelays$ } from "@/lib/settings";
-import { pool } from "@/lib/nostr";
 import { relaySet } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
 import {
@@ -16,6 +6,17 @@ import {
 } from "marmot-ts";
 import { useState } from "react";
 import { combineLatest, of, switchMap } from "rxjs";
+
+import { EventStatusButton } from "@/components/event-status-button";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import accountManager, {
+  keyPackageRelays$,
+  mailboxes$,
+  user$,
+} from "@/lib/accounts";
+import { pool } from "@/lib/nostr";
+import { extraRelays$, lookupRelays$ } from "@/lib/settings";
 import { NewRelayForm, RelayItem } from "./relays";
 
 // Observable of current user's key package relay list event

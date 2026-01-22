@@ -5,7 +5,7 @@ import { NostrConnectAccount } from "applesauce-accounts/accounts";
 import { NostrConnectSigner } from "applesauce-signers";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
-import accountManager from "../../lib/accounts";
+import accountManager from "@/lib/accounts";
 
 interface SignerBunkerProps {
   onSuccess?: () => void;

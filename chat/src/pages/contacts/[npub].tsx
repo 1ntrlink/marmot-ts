@@ -1,6 +1,3 @@
-import { UserAvatar, UserName } from "@/components/nostr-user";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { eventStore, pool } from "@/lib/nostr";
 import { castUser, User } from "applesauce-common/casts/user";
 import { mapEventsToTimeline } from "applesauce-core";
 import {
@@ -25,9 +22,13 @@ import { useMemo, useState } from "react";
 import { useParams } from "react-router";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
-import FollowButton from "../../components/follow-button";
-import { PageHeader } from "../../components/page-header";
-import QRButton from "../../components/qr-button";
+
+import FollowButton from "@/components/follow-button";
+import { UserAvatar, UserName } from "@/components/nostr-user";
+import { PageHeader } from "@/components/page-header";
+import QRButton from "@/components/qr-button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { eventStore, pool } from "@/lib/nostr";
 
 function KeyPackageCard({ event }: { event: NostrEvent }) {
   const [expanded, setExpanded] = useState(false);

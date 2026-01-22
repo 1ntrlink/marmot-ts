@@ -10,6 +10,7 @@ import {
 import { useMemo, useState } from "react";
 import { of } from "rxjs";
 import { map } from "rxjs/operators";
+
 import CipherSuiteBadge from "@/components/cipher-suite-badge";
 import KeyPackageDetailsModal from "@/components/key-package/details-modal";
 import { UserAvatar, UserName } from "@/components/nostr-user";

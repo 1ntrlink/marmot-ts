@@ -16,11 +16,12 @@ import {
 import { use$ } from "applesauce-react/hooks";
 import { Loader2Icon, WifiIcon, WifiOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { PageBody } from "../../components/page-body";
-import { PageHeader } from "../../components/page-header";
-import { actions, user$ } from "../../lib/accounts";
-import { pool } from "../../lib/nostr";
-import { EventStatusButton } from "../../components/event-status-button";
+
+import { EventStatusButton } from "@/components/event-status-button";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import { actions, user$ } from "@/lib/accounts";
+import { pool } from "@/lib/nostr";
 
 export function RelayItem({
   relay,
