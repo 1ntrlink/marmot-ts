@@ -9,6 +9,7 @@ import { combineLatest, from, map, shareReplay } from "rxjs";
 import { AppSidebar } from "@/components/app-sidebar";
 import CipherSuiteBadge from "@/components/cipher-suite-badge";
 import { SubscriptionStatusButton } from "@/components/subscription-status-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
 import { withSignIn } from "@/components/with-signIn";
@@ -32,7 +33,7 @@ function KeyPackageItem({
   keyPackage,
   event,
 }: {
-  keyPackage: ListedKeyPackage;
+  keyPackage: ListedKeyPackage & { isLocal?: boolean };
   event?: NostrEvent;
 }) {
   const location = useLocation();
@@ -57,6 +58,11 @@ function KeyPackageItem({
         <span className="font-medium truncate">
           {client?.name || "Unknown Client"}
         </span>
+        {!keyPackage.isLocal && (
+          <Badge variant="outline" className="text-xs ml-2">
+            Not stored locally
+          </Badge>
+        )}
         <span className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{timeAgo}</span>
         </span>
@@ -83,6 +89,44 @@ function KeyPackagesPage() {
   );
   const published = use$(publishedKeyPackages$);
 
+  // Combine published and local key packages to show all published packages
+  const displayItems = useMemo(() => {
+    if (!published || published.length === 0) {
+      return { items: [], uniqueCount: 0 };
+    }
+
+    // Deduplicate by keyPackageRef - use first occurrence (most likely from best relay)
+    const seen = new Set<string>();
+    const uniquePublished: typeof published = [];
+
+    for (const pkg of published) {
+      const hexRef = bytesToHex(pkg.keyPackageRef);
+      if (!seen.has(hexRef)) {
+        seen.add(hexRef);
+        uniquePublished.push(pkg);
+      }
+    }
+
+    const items = uniquePublished.map((publishedPkg) => {
+      // Try to find matching local key package
+      const localKeyPackage = keyPackages?.find(
+        (pkg) =>
+          bytesToHex(pkg.keyPackageRef) ===
+          bytesToHex(publishedPkg.keyPackageRef),
+      );
+
+      return {
+        keyPackageRef: publishedPkg.keyPackageRef,
+        publicPackage:
+          localKeyPackage?.publicPackage || publishedPkg.keyPackage,
+        event: publishedPkg.event,
+        isLocal: !!localKeyPackage,
+      };
+    });
+
+    return { items, uniqueCount: seen.size };
+  }, [published, keyPackages]);
+
   return (
     <>
       <AppSidebar
@@ -100,29 +144,23 @@ function KeyPackagesPage() {
         }
       >
         <div className="flex flex-col">
-          {keyPackages && keyPackages.length > 0 ? (
-            keyPackages.map((keyPackage) => (
+          {displayItems.items.length > 0 ? (
+            displayItems.items.map((item) => (
               <KeyPackageItem
-                key={bytesToHex(keyPackage.keyPackageRef)}
-                keyPackage={keyPackage}
-                event={
-                  published?.find(
-                    (pkg) =>
-                      bytesToHex(pkg.keyPackageRef) ===
-                      bytesToHex(keyPackage.keyPackageRef),
-                  )?.event
-                }
+                key={bytesToHex(item.keyPackageRef)}
+                keyPackage={item}
+                event={item.event}
               />
             ))
           ) : (
             <div className="p-4 text-sm text-muted-foreground text-center">
-              {keyPackages === undefined ? "Loading..." : "No key packages yet"}
+              {published === undefined ? "Loading..." : "No key packages yet"}
             </div>
           )}
         </div>
 
         <div className="p-4 text-sm text-muted-foreground text-center">
-          Found {published?.length ?? 0} published key packages
+          Found {displayItems.uniqueCount} published key packages
         </div>
       </AppSidebar>
       <SidebarInset>

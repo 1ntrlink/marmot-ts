@@ -10,9 +10,8 @@ import { combineLatest, of, switchMap } from "rxjs";
 import { EventStatusButton } from "@/components/event-status-button";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { user$, accounts } from "@/lib/accounts";
+import { user$, accounts, actions } from "@/lib/accounts";
 import { keyPackageRelays$ } from "@/lib/lifecycle";
-import { pool } from "@/lib/nostr";
 import { extraRelays$, lookupRelays$ } from "@/lib/settings";
 import { NewRelayForm, RelayItem } from "./relays";
 
@@ -69,7 +68,7 @@ function KeyPackageRelaysSection() {
         );
 
       // Publish to all publishing relays in parallel
-      await pool.publish(allPublishingRelays, signedEvent);
+      await actions.publish(signedEvent, allPublishingRelays);
 
       setPublishSuccess(true);
       // Clear success message after 3 seconds

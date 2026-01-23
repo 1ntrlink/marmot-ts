@@ -46,58 +46,78 @@ function KeyPackageRelayStatus({ event }: { event: NostrEvent | undefined }) {
     [event?.id],
   );
 
-  // Calculate which key package relays have the event and which don't
+  // Calculate relay status
   const relayStatus = useMemo(() => {
-    if (!keyPackageRelays || !event) {
-      return { seen: [], notSeen: [] };
+    if (!event) {
+      return { found: [], notInConfigured: [] };
     }
 
     const seenSet = seenRelays || new Set<string>();
-    const seen: string[] = [];
-    const notSeen: string[] = [];
+    const found: string[] = [];
 
-    for (const relay of keyPackageRelays) {
-      if (seenSet.has(relay)) {
-        seen.push(relay);
-      } else {
-        notSeen.push(relay);
+    // All relays where the event was found
+    for (const relay of seenSet) {
+      found.push(relay);
+    }
+
+    // Configured relays that don't have the event yet
+    const notInConfigured: string[] = [];
+    if (keyPackageRelays) {
+      for (const relay of keyPackageRelays) {
+        if (!seenSet.has(relay)) {
+          notInConfigured.push(relay);
+        }
       }
     }
 
-    return { seen, notSeen };
+    return { found, notInConfigured };
   }, [keyPackageRelays, seenRelays, event]);
-  if (event && keyPackageRelays && keyPackageRelays.length > 0) {
+
+  if (!event) {
     return (
       <div>
-        <Label className="text-muted-foreground/60 mb-1 text-xs">
-          Key Package Relays Status
-        </Label>
-        <div className="space-y-2">
-          {relayStatus.seen.length > 0 && (
+        <Label className="text-muted-foreground/60 mb-1 text-xs">Status</Label>
+        <Badge variant="outline">Unpublished</Badge>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <Label className="text-muted-foreground/60 mb-1 text-xs">
+        Found on Relays
+      </Label>
+      <div className="space-y-2">
+        {/* All relays where the event was found */}
+        {relayStatus.found.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {relayStatus.found.map((relay) => (
+              <Badge
+                key={relay}
+                variant="secondary"
+                className="text-xs font-mono"
+              >
+                {relay}
+              </Badge>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No relays found with this event yet
+          </p>
+        )}
+
+        {/* Configured relays that don't have the event */}
+        {keyPackageRelays &&
+          keyPackageRelays.length > 0 &&
+          relayStatus.notInConfigured.length > 0 && (
             <div>
               <p className="text-xs text-muted-foreground mb-1">
-                Found on ({relayStatus.seen.length}):
+                Not found on configured relays (
+                {relayStatus.notInConfigured.length}):
               </p>
               <div className="flex flex-wrap gap-1">
-                {relayStatus.seen.map((relay) => (
-                  <Badge
-                    key={relay}
-                    variant="secondary"
-                    className="text-xs font-mono"
-                  >
-                    {relay}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-          {relayStatus.notSeen.length > 0 && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">
-                Not found on ({relayStatus.notSeen.length}):
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {relayStatus.notSeen.map((relay) => (
+                {relayStatus.notInConfigured.map((relay) => (
                   <Badge
                     key={relay}
                     variant="outline"
@@ -109,50 +129,9 @@ function KeyPackageRelayStatus({ event }: { event: NostrEvent | undefined }) {
               </div>
             </div>
           )}
-        </div>
       </div>
-    );
-  }
-
-  if (event && (!keyPackageRelays || keyPackageRelays.length === 0)) {
-    return (
-      <div>
-        <Label className="text-muted-foreground/60 mb-1 text-xs">
-          Found on Relays
-        </Label>
-        <div className="space-y-1">
-          {!seenRelays || seenRelays.size === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              No relays found with this event
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-1">
-              {Array.from(seenRelays).map((relay) => (
-                <Badge
-                  key={relay}
-                  variant="secondary"
-                  className="text-xs font-mono"
-                >
-                  {relay}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (!event) {
-    return (
-      <div>
-        <Label className="text-muted-foreground/60 mb-1 text-xs">Status</Label>
-        <Badge variant="outline">Unpublished</Badge>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }
 
 function PublishKeyPackageButton({
@@ -201,22 +180,29 @@ function PublishKeyPackageButton({
 
 function DeleteKeyPackageButton({
   event,
+  keyPackageRef,
 }: {
   event?: NostrEvent;
-  keyPackage: KeyPackage;
+  keyPackageRef: Uint8Array;
 }) {
+  const client = use$(marmotClient$);
   const keyPackageRelays = use$(keyPackageRelays$);
   const navigate = useNavigate();
 
   const [deleting, setDeleting] = useState(false);
   const handleDeleteKeyPackage = async () => {
     if (!event) return;
-    if (!keyPackageRelays) return;
 
     try {
       setDeleting(true);
 
-      // TODO: implement deleting key package and cleaning up published event
+      // Remove from local store
+      if (client) {
+        await client.keyPackageStore.remove(keyPackageRef);
+      }
+
+      // TODO: Implement deletion from relays (requires NIP-09 or similar)
+      // For now, just navigate back
     } catch (err) {
       console.error("Error deleting key package:", err);
     } finally {
@@ -231,7 +217,7 @@ function DeleteKeyPackageButton({
       disabled={deleting}
       variant="destructive"
     >
-      {deleting ? "Deleting..." : "Delete key package"}{" "}
+      {deleting ? "Deleting..." : "Delete key package"}
     </Button>
   );
 }
@@ -244,17 +230,25 @@ function BroadcastKeyPackageButton({
 }) {
   const keyPackageRelays = use$(keyPackageRelays$);
   const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [broadcastStatus, setBroadcastStatus] = useState<
+    "idle" | "success" | "error"
+  >("idle");
 
   const handleBroadcast = async () => {
     if (!event) return;
 
     try {
-      if (!keyPackageRelays || keyPackageRelays.length === 0)
-        throw new Error("No key package relays configured");
+      if (!keyPackageRelays || keyPackageRelays.length === 0) {
+        setBroadcastStatus("error");
+        return;
+      }
       setIsBroadcasting(true);
+      setBroadcastStatus("idle");
       await pool.publish(keyPackageRelays, event);
+      setBroadcastStatus("success");
     } catch (err) {
       console.error("Error broadcasting event:", err);
+      setBroadcastStatus("error");
     } finally {
       setIsBroadcasting(false);
     }
@@ -263,13 +257,23 @@ function BroadcastKeyPackageButton({
   if (!event) return null;
 
   return (
-    <Button
-      onClick={handleBroadcast}
-      disabled={isBroadcasting}
-      variant="outline"
-    >
-      {isBroadcasting ? "Broadcasting..." : "Broadcast event"}
-    </Button>
+    <div className="flex flex-col gap-1">
+      <Button
+        onClick={handleBroadcast}
+        disabled={isBroadcasting}
+        variant="outline"
+      >
+        {isBroadcasting ? "Broadcasting..." : "Broadcast event"}
+      </Button>
+      {broadcastStatus === "success" && (
+        <span className="text-xs text-green-600">Event broadcasted</span>
+      )}
+      {broadcastStatus === "error" && !isBroadcasting && (
+        <span className="text-xs text-red-600">
+          No key package relays configured
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -292,6 +296,7 @@ function KeyPackageDetailBody({
   const cipherSuiteId = keyPackage.publicPackage.cipherSuite;
   const clientInfo = event ? getKeyPackageClient(event) : undefined;
   const timeAgo = event ? formatTimeAgo(event.created_at) : "Unpublished";
+  const isLocal = !!keyPackage.privatePackage;
 
   return (
     <>
@@ -343,10 +348,15 @@ function KeyPackageDetailBody({
                 <Label className="text-muted-foreground/60 mb-1 text-xs">
                   Client
                 </Label>
-                <div>
+                <div className="flex items-center gap-2">
                   <Badge variant="outline">
                     {clientInfo.name || "Unknown"}
                   </Badge>
+                  {!isLocal && (
+                    <Badge variant="outline" className="text-xs">
+                      Not stored locally
+                    </Badge>
+                  )}
                 </div>
               </div>
             )}
@@ -367,18 +377,27 @@ function KeyPackageDetailBody({
             </div>
           </CardContent>
           <CardFooter className="flex gap-2">
-            <PublishKeyPackageButton
-              event={event}
-              keyPackage={keyPackage.publicPackage}
-            />
-            <BroadcastKeyPackageButton
-              event={event}
-              keyPackage={keyPackage.publicPackage}
-            />
-            <DeleteKeyPackageButton
-              event={event}
-              keyPackage={keyPackage.publicPackage}
-            />
+            {isLocal ? (
+              <>
+                <PublishKeyPackageButton
+                  event={event}
+                  keyPackage={keyPackage.publicPackage}
+                />
+                <BroadcastKeyPackageButton
+                  event={event}
+                  keyPackage={keyPackage.publicPackage}
+                />
+                <DeleteKeyPackageButton
+                  event={event}
+                  keyPackageRef={keyPackage.keyPackageRef}
+                />
+              </>
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                This key package is published on relays but not stored locally.
+                Private key material is not available.
+              </div>
+            )}
           </CardFooter>
         </Card>
 
@@ -401,6 +420,8 @@ export default function KeyPackageDetailPage() {
   const { id } = useParams<{ id: string }>();
   const ref = useMemo(() => (id ? hexToBytes(id) : undefined), [id]);
   const client = use$(marmotClient$);
+  const publishedKeyPackages = use$(publishedKeyPackages$);
+
   const keyPackage = use$(
     () =>
       client && ref
@@ -408,6 +429,14 @@ export default function KeyPackageDetailPage() {
         : undefined,
     [client, ref],
   );
+
+  // Try to find the published key package if not found locally
+  const publishedKeyPackage = useMemo(() => {
+    if (!ref || !publishedKeyPackages) return undefined;
+    return publishedKeyPackages.find(
+      (pkg) => bytesToHex(pkg.keyPackageRef) === bytesToHex(ref),
+    );
+  }, [ref, publishedKeyPackages]);
 
   if (!ref) {
     return (
@@ -429,7 +458,7 @@ export default function KeyPackageDetailPage() {
     );
   }
 
-  if (!keyPackage) {
+  if (!keyPackage && !publishedKeyPackage) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center text-muted-foreground">
@@ -439,5 +468,12 @@ export default function KeyPackageDetailPage() {
     );
   }
 
-  return <KeyPackageDetailBody keyPackage={keyPackage} />;
+  // If not stored locally but published, create a minimal StoredKeyPackage
+  const displayKeyPackage = keyPackage || {
+    keyPackageRef: publishedKeyPackage!.keyPackageRef,
+    publicPackage: publishedKeyPackage!.keyPackage,
+    privatePackage: null, // No private package available
+  };
+
+  return <KeyPackageDetailBody keyPackage={displayKeyPackage} />;
 }
