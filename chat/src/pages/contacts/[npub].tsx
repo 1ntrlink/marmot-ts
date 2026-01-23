@@ -15,11 +15,13 @@ import {
   getKeyPackageMLSVersion,
   getKeyPackageRelayList,
   getKeyPackageRelays,
+  extractMarmotGroupData,
   KEY_PACKAGE_KIND,
   KEY_PACKAGE_RELAY_LIST_KIND,
 } from "marmot-ts";
 import { useMemo, useState } from "react";
 import { useParams } from "react-router";
+import { from, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
 import { KeyPackage } from "ts-mls";
 
@@ -27,8 +29,29 @@ import FollowButton from "@/components/follow-button";
 import { UserAvatar, UserName } from "@/components/nostr-user";
 import { PageHeader } from "@/components/page-header";
 import QRButton from "@/components/qr-button";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { groupStore$ } from "@/lib/group-store";
 import { eventStore, pool } from "@/lib/nostr";
+import { marmotClient$ } from "@/lib/marmot-client";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function KeyPackageCard({ event }: { event: NostrEvent }) {
   const [expanded, setExpanded] = useState(false);
@@ -339,6 +362,13 @@ function ContactDetailContent({ user }: { user: User }) {
   const displayName = profile?.displayName;
   const outboxes = use$(user.outboxes$);
 
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [selectedKeyPackageEventId, setSelectedKeyPackageEventId] =
+    useState<string>("");
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+
   const keyPackageRelayList = use$(
     () => user.replaceable(KEY_PACKAGE_RELAY_LIST_KIND, undefined, outboxes),
     [user.pubkey, outboxes?.join(",")],
@@ -364,6 +394,52 @@ function ContactDetailContent({ user }: { user: User }) {
         map((arr) => [...arr]),
       );
   }, [user.pubkey, keyPackageRelays?.join(",")]);
+
+  const groups = use$(
+    () =>
+      groupStore$.pipe(
+        switchMap((store) =>
+          store ? from(store.list()) : from(Promise.resolve([])),
+        ),
+      ),
+    [],
+  );
+
+  const client = use$(marmotClient$);
+
+  const handleInvite = async () => {
+    setInviteError(null);
+    if (!client) {
+      setInviteError("Client not ready");
+      return;
+    }
+    if (!selectedGroupId) {
+      setInviteError("Select a group");
+      return;
+    }
+    const selectedEvent =
+      (keyPackages as NostrEvent[] | undefined)?.find(
+        (e) => e.id === selectedKeyPackageEventId,
+      ) ?? null;
+    if (!selectedEvent) {
+      setInviteError("Select a KeyPackage event");
+      return;
+    }
+
+    try {
+      setIsInviting(true);
+      const group = await client.getGroup(selectedGroupId);
+      await group.inviteByKeyPackageEvent(selectedEvent);
+      setInviteOpen(false);
+      setSelectedGroupId("");
+      setSelectedKeyPackageEventId("");
+    } catch (err) {
+      console.error("Failed to invite:", err);
+      setInviteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsInviting(false);
+    }
+  };
 
   return (
     <>
@@ -391,6 +467,78 @@ function ContactDetailContent({ user }: { user: User }) {
           <div className="flex">
             <QRButton data={user.npub} size="lg" label="NPUB" />
             <FollowButton pubkey={user.pubkey} size="lg" />
+            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="lg">
+                  Invite to group
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite to group</DialogTitle>
+                  <DialogDescription>
+                    Choose a group and one of this contact's KeyPackage events.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Group</Label>
+                    <Select
+                      value={selectedGroupId}
+                      onValueChange={setSelectedGroupId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a group" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(groups ?? []).map((g) => {
+                          const groupId = bytesToHex(g.groupContext.groupId);
+                          const name =
+                            extractMarmotGroupData(g)?.name || "Unnamed Group";
+                          return (
+                            <SelectItem key={groupId} value={groupId}>
+                              {name}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>KeyPackage event</Label>
+                    <Select
+                      value={selectedKeyPackageEventId}
+                      onValueChange={setSelectedKeyPackageEventId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select KeyPackage event" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(keyPackages ?? []).map((e) => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.id.slice(0, 16)}...
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {inviteError && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{inviteError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button onClick={handleInvite} disabled={isInviting}>
+                    {isInviting ? "Inviting..." : "Send invite"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 

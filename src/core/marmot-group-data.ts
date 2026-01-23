@@ -8,6 +8,11 @@ import {
   MarmotGroupData,
 } from "./protocol.js";
 
+// Avoid spamming the console with forward-compat warnings.
+// This decoder may be called frequently by UIs that re-render, and the warning
+// is informational only (we intentionally ignore trailing bytes for newer versions).
+const warnedExtraBytes = new Set<string>();
+
 /**
  * Marmot Group Data Extension Implementation (MIP-01)
  *
@@ -216,9 +221,14 @@ export function decodeMarmotGroupData(
   // Validate no extra data
   if (offset !== extensionData.length) {
     // For forward compatibility, log warning but continue
-    console.warn(
-      `Extension has ${extensionData.length - offset} extra bytes (version ${version} may have additional fields)`,
-    );
+    const extra = extensionData.length - offset;
+    const key = `${version}:${extra}`;
+    if (!warnedExtraBytes.has(key)) {
+      warnedExtraBytes.add(key);
+      console.warn(
+        `Extension has ${extra} extra bytes (version ${version} may have additional fields)`,
+      );
+    }
   }
 
   return {

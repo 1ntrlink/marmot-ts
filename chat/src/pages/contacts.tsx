@@ -9,6 +9,8 @@ import {
 import { user$ } from "@/lib/accounts";
 import { IconLock } from "@tabler/icons-react";
 import { castUser, User } from "applesauce-common/casts/user";
+import { normalizeToProfilePointer } from "applesauce-core/helpers";
+import { npubEncode } from "applesauce-core/helpers/pointers";
 import { use$ } from "applesauce-react/hooks";
 import { KEY_PACKAGE_RELAY_LIST_KIND } from "marmot-ts";
 import { useMemo, useState } from "react";
@@ -92,9 +94,28 @@ export default function ContactsPage() {
     if (!contacts) return [];
     if (!debouncedQuery.trim()) return contacts;
 
-    return profileSearch
-      .search(debouncedQuery.toLowerCase().trim())
+    const trimmed = debouncedQuery.trim();
+
+    // Allow direct navigation by pasting a pubkey (hex) or npub.
+    // This makes it possible to open a contact detail page and discover
+    // KeyPackages even if the user isn't already in the local contacts list.
+    let directPubkey: string | null = null;
+    try {
+      const pointer = normalizeToProfilePointer(trimmed);
+      directPubkey = pointer?.pubkey ?? null;
+    } catch {
+      directPubkey = null;
+    }
+
+    const searchResults = profileSearch
+      .search(trimmed.toLowerCase())
       .map((r) => castUser(r.item.pubkey, eventStore));
+
+    if (!directPubkey) return searchResults;
+
+    const directUser = castUser(directPubkey, eventStore);
+    const directNpub = npubEncode(directPubkey);
+    return [directUser, ...searchResults.filter((u) => u.npub !== directNpub)];
   }, [contacts, debouncedQuery]);
 
   const hasKeyPackageRelays = use$(hasKeyPackageRelays$);

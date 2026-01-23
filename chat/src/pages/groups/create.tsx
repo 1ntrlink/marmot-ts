@@ -6,7 +6,7 @@ import {
   createCredential,
   generateKeyPackage,
 } from "marmot-ts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import type { CiphersuiteName, KeyPackage } from "ts-mls";
 import {
@@ -28,6 +28,7 @@ import { withSignIn } from "@/components/with-signIn";
 import accountManager from "@/lib/accounts";
 import { keyPackageStore$ } from "@/lib/key-package-store";
 import { marmotClient$ } from "@/lib/marmot-client";
+import { extraRelays$ } from "@/lib/settings";
 import { switchMap } from "rxjs";
 
 // ============================================================================
@@ -51,6 +52,7 @@ interface ConfigurationFormProps {
   keyPackages: KeyPackage[];
   keyPackageStore: any;
   isCreating: boolean;
+  defaultRelays: string[];
   onSubmit: (data: ConfigurationFormData) => void;
 }
 
@@ -58,6 +60,7 @@ function ConfigurationForm({
   keyPackages,
   keyPackageStore,
   isCreating,
+  defaultRelays,
   onSubmit,
 }: ConfigurationFormProps) {
   const [selectedKeyPackageId, setSelectedKeyPackageId] = useState("");
@@ -66,7 +69,19 @@ function ConfigurationForm({
   const [groupName, setGroupName] = useState("My Group");
   const [groupDescription, setGroupDescription] = useState("");
   const [adminPubkeys, setAdminPubkeys] = useState<string[]>([]);
-  const [relays, setRelays] = useState<string[]>([]);
+  const [relays, setRelays] = useState<string[]>(defaultRelays);
+
+  // Keep relays populated with the user's default relays unless the user has
+  // already made an explicit change.
+  const [hasTouchedRelays, setHasTouchedRelays] = useState(false);
+
+  // If default relays change (initial load / account switch), refresh the list
+  // only if the user hasn't edited it.
+  useEffect(() => {
+    if (hasTouchedRelays) return;
+    if (defaultRelays.length === 0) return;
+    setRelays(defaultRelays);
+  }, [defaultRelays.join(","), hasTouchedRelays]);
 
   const handleKeyPackageSelect = async (keyPackageId: string) => {
     if (!keyPackageStore || !keyPackageId) {
@@ -96,6 +111,10 @@ function ConfigurationForm({
   };
 
   const handleSubmit = async () => {
+    // Default to the user's relay set if none selected.
+    // The parent can still override, but this ensures the form is valid.
+    const effectiveRelays = relays.length > 0 ? relays : defaultRelays;
+
     // If no key package is selected, generate a new one with defaults
     let keyPackageToUse = selectedKeyPackage;
 
@@ -134,7 +153,7 @@ function ConfigurationForm({
       groupName,
       groupDescription,
       adminPubkeys,
-      relays,
+      relays: effectiveRelays,
     });
   };
 
@@ -227,8 +246,11 @@ function ConfigurationForm({
           label="Relays (Required)"
           placeholder="wss://relay.example.com"
           disabled={isCreating}
-          emptyMessage="At least one relay is required to publish group events."
-          onRelaysChange={setRelays}
+          emptyMessage="Leave this empty to use your default relay set."
+          onRelaysChange={(next) => {
+            setHasTouchedRelays(true);
+            setRelays(next);
+          }}
         />
       </div>
 
@@ -236,7 +258,11 @@ function ConfigurationForm({
         <Button
           className="w-full"
           onClick={handleSubmit}
-          disabled={isCreating || !groupName.trim() || relays.length === 0}
+          disabled={
+            isCreating ||
+            !groupName.trim() ||
+            (relays.length === 0 && defaultRelays.length === 0)
+          }
         >
           {isCreating ? (
             <>
@@ -259,6 +285,7 @@ function ConfigurationForm({
 function CreateGroupPage() {
   const client = use$(marmotClient$);
   const keyPackageStore = use$(keyPackageStore$);
+  const extraRelays = use$(extraRelays$);
   const storedKeyPackages = use$(
     () => keyPackageStore$.pipe(switchMap((store) => store.list())),
     [],
@@ -331,7 +358,14 @@ function CreateGroupPage() {
           keyPackages={keyPackages}
           keyPackageStore={keyPackageStore}
           isCreating={isCreating}
-          onSubmit={handleFormSubmit}
+          defaultRelays={extraRelays ?? []}
+          onSubmit={(data) => {
+            // Populate group relays from the user's relay config if none provided.
+            // This keeps UX simple: in most cases the defaults are acceptable.
+            const relays =
+              data.relays.length > 0 ? data.relays : (extraRelays ?? []);
+            return handleFormSubmit({ ...data, relays });
+          }}
         />
 
         {/* Error Display */}

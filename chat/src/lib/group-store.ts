@@ -12,6 +12,9 @@ import { GroupStore, defaultMarmotClientConfig } from "marmot-ts";
 // Observable that triggers whenever the store changes
 const storeChanges$ = new BehaviorSubject<number>(0);
 
+/** Emits whenever the local group store mutates (add/update/remove/clear). */
+export const groupStoreChanges$ = storeChanges$.asObservable();
+
 // Create and export a shared GroupStore instance
 export const groupStore$ = accountManager.active$.pipe(
   map((account) => {

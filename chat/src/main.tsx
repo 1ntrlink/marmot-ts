@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import "./index.css";
 
+import "@/lib/runtime";
+
 import { ThemeProvider } from "./components/theme-providers";
 import { SidebarProvider } from "./components/ui/sidebar";
 
@@ -14,6 +16,7 @@ import GroupsPage from "./pages/groups.tsx";
 import CreateGroupPage from "./pages/groups/create.tsx";
 import GroupDetailPage from "./pages/groups/[id].tsx";
 import HomePage from "./pages/index.tsx";
+import InvitesPage from "./pages/invites.tsx";
 import KeyPackagePage from "./pages/key-packages.tsx";
 import KeyPackageDetailPage from "./pages/key-packages/[id].tsx";
 import CreateKeyPackagePage from "./pages/key-packages/create.tsx";
@@ -50,6 +53,7 @@ createRoot(document.getElementById("root")!).render(
               <Route path="create" element={<CreateGroupPage />} />
               <Route path=":id" element={<GroupDetailPage />} />
             </Route>
+            <Route path="/invites" element={<InvitesPage />} />
             <Route path="/key-packages" element={<KeyPackagePage />}>
               <Route path="create" element={<CreateKeyPackagePage />} />
               <Route path=":id" element={<KeyPackageDetailPage />} />

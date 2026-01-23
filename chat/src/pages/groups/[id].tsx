@@ -1,19 +1,66 @@
 import { Rumor } from "applesauce-common/helpers/gift-wrap";
 import { use$ } from "applesauce-react/hooks";
 import { Loader2, XCircle } from "lucide-react";
-import { extractMarmotGroupData, MarmotGroup, unixNow } from "marmot-ts";
+import { mapEventsToTimeline } from "applesauce-core";
+import type { NostrEvent } from "applesauce-core/helpers";
+import {
+  extractMarmotGroupData,
+  getNostrGroupIdHex,
+  getGroupMembers,
+  MarmotGroup,
+  unixNow,
+} from "marmot-ts";
 import { getEventHash } from "nostr-tools";
-import { useEffect, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 import { from, of, switchMap } from "rxjs";
+import { map } from "rxjs/operators";
+import { catchError } from "rxjs/operators";
 
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { withSignIn } from "@/components/with-signIn";
 import accountManager from "@/lib/accounts";
+import { pool } from "@/lib/nostr";
+import { getGroupSubscriptionManager } from "@/lib/runtime";
 import { marmotClient$ } from "@/lib/marmot-client";
+import { user$ } from "@/lib/accounts";
+import { extraRelays$ } from "@/lib/settings";
+
+function jsonStringifySafe(value: unknown): string {
+  return JSON.stringify(
+    value,
+    (_k, v) => (typeof v === "bigint" ? v.toString() : v),
+    2,
+  );
+}
 
 // ============================================================================
 // Component: MessageItem
@@ -198,23 +245,44 @@ function useMessageSender(group: MarmotGroup | null) {
 
 function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Array<Rumor>>([]);
   const [messageText, setMessageText] = useState("");
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [inviteContactPubkey, setInviteContactPubkey] = useState<string>("");
+  const [selectedKeyPackageEventId, setSelectedKeyPackageEventId] =
+    useState("");
+  const [isInviting, setIsInviting] = useState(false);
+  const [inviteError, setInviteError] = useState<string | null>(null);
   const [currentUserPubkey, setCurrentUserPubkey] = useState<string | null>(
     null,
   );
 
   // Get the selected group from marmotClient$
   const group = use$(
-    marmotClient$.pipe(
-      switchMap((client) => {
-        if (!client || !id) {
-          return of<MarmotGroup | null>(null);
-        }
-        return from(client.getGroup(id));
-      }),
-    ),
+    () =>
+      marmotClient$.pipe(
+        switchMap((client) => {
+          if (!client || !id) {
+            return of<MarmotGroup | null>(null);
+          }
+          return from(client.getGroup(id)).pipe(
+            catchError(() => of<MarmotGroup | null>(null)),
+          );
+        }),
+      ),
+    [id],
   );
+
+  // If the group doesn't exist locally, go back to the groups list.
+  // Only do this after we have a resolved value (null means "not found").
+  useEffect(() => {
+    if (!id) return;
+    if (group === null) {
+      navigate("/groups");
+    }
+  }, [id, group, navigate]);
 
   // Get current user pubkey
   const account = accountManager.active;
@@ -252,25 +320,29 @@ function GroupDetailPage() {
     });
   };
 
-  // TODO: Register callback with subscription manager to receive application messages
-  // This will need the GroupSubscriptionManager implementation from examples
-  useEffect(() => {
-    if (!group) return;
+  const groupIdHex = useMemo(() => {
+    if (!group) return null;
+    return getNostrGroupIdHex(group.state);
+  }, [group]);
 
-    // For now, just clear messages when group changes
+  useEffect(() => {
+    if (!groupIdHex) return;
+
+    // Clear messages when switching groups
     setMessages([]);
 
-    // TODO: Subscribe to group messages
-    // const groupIdHex = getNostrGroupIdHex(group.state);
-    // const subscriptionManager = getSubscriptionManager();
-    // if (subscriptionManager) {
-    //   const unsubscribe = subscriptionManager.onApplicationMessage(
-    //     groupIdHex,
-    //     handleMessagesReceived,
-    //   );
-    //   return unsubscribe;
-    // }
-  }, [group]);
+    const subscriptionManager = getGroupSubscriptionManager();
+    if (!subscriptionManager) return;
+
+    // If the user is currently viewing the group, mark it as seen.
+    subscriptionManager.markGroupSeen(groupIdHex, unixNow());
+
+    return subscriptionManager.onApplicationMessage(groupIdHex, (msgs) => {
+      // Messages arriving while on the group page should not count as unread.
+      subscriptionManager.markGroupSeen(groupIdHex, unixNow());
+      handleMessagesReceived(msgs);
+    });
+  }, [groupIdHex]);
 
   // Message sender
   const {
@@ -301,6 +373,82 @@ function GroupDetailPage() {
     ? extractMarmotGroupData(group.state)?.name || "Unnamed Group"
     : "Loading...";
 
+  const groupDetails = useMemo(() => {
+    if (!group) return null;
+
+    const data = extractMarmotGroupData(group.state);
+    const members = getGroupMembers(group.state);
+
+    return {
+      name: data?.name || "Unnamed Group",
+      epoch: group.state.groupContext.epoch,
+      members,
+      state: group.state,
+    };
+  }, [group]);
+
+  const isAdmin = useMemo(() => {
+    if (!group || !currentUserPubkey) return false;
+    const data = extractMarmotGroupData(group.state);
+    return data?.adminPubkeys?.includes(currentUserPubkey) ?? false;
+  }, [group, currentUserPubkey]);
+
+  const contacts = use$(user$.contacts$);
+  const contactOptions = useMemo(() => {
+    return (contacts ?? []).map((c) => ({
+      pubkey: c.pubkey,
+      label: `${c.pubkey.slice(0, 12)}...`,
+    }));
+  }, [contacts]);
+
+  const extraRelays = use$(extraRelays$);
+
+  const contactKeyPackages = use$(() => {
+    if (!inviteContactPubkey) return;
+    return pool
+      .request(extraRelays ?? [], {
+        kinds: [443],
+        authors: [inviteContactPubkey],
+        limit: 50,
+      })
+      .pipe(
+        mapEventsToTimeline(),
+        map((arr) => [...arr] as NostrEvent[]),
+      );
+  }, [inviteContactPubkey, extraRelays?.join(",")]);
+
+  const handleInvite = async () => {
+    if (!group) return;
+
+    setInviteError(null);
+
+    if (!isAdmin) {
+      setInviteError("Only group admins can invite members");
+      return;
+    }
+
+    const selectedEvent =
+      contactKeyPackages?.find((e) => e.id === selectedKeyPackageEventId) ??
+      null;
+    if (!selectedEvent) {
+      setInviteError("Select a KeyPackage event to invite");
+      return;
+    }
+
+    try {
+      setIsInviting(true);
+      await group.inviteByKeyPackageEvent(selectedEvent);
+      setInviteOpen(false);
+      setInviteContactPubkey("");
+      setSelectedKeyPackageEventId("");
+    } catch (err) {
+      console.error("Failed to invite member:", err);
+      setInviteError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   if (!id) {
     return (
       <>
@@ -321,7 +469,7 @@ function GroupDetailPage() {
     );
   }
 
-  if (!group) {
+  if (group === undefined) {
     return (
       <>
         <PageHeader
@@ -332,13 +480,27 @@ function GroupDetailPage() {
           ]}
         />
         <div className="flex items-center justify-center h-full p-4">
-          <div className="flex items-center gap-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Loading group...</span>
+          <div className="flex flex-col items-center gap-3 text-center">
+            <div className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading group...</span>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/groups")}
+            >
+              Back to Groups
+            </Button>
           </div>
         </div>
       </>
     );
+  }
+
+  if (group === null) {
+    return null;
   }
 
   return (
@@ -349,6 +511,170 @@ function GroupDetailPage() {
           { label: "Groups", to: "/groups" },
           { label: groupName },
         ]}
+        actions={
+          <div className="flex items-center gap-2">
+            <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="sm">
+                  Details
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-lg">
+                <SheetHeader>
+                  <SheetTitle>Group details</SheetTitle>
+                  <SheetDescription>
+                    Inspect metadata and MLS state (read-only).
+                  </SheetDescription>
+                </SheetHeader>
+
+                <div className="p-4 space-y-4 overflow-auto">
+                  {groupDetails && (
+                    <>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className="text-xs text-muted-foreground">
+                            Name
+                          </div>
+                          <div className="text-sm font-medium">
+                            {groupDetails.name}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-muted-foreground">
+                            Epoch
+                          </div>
+                          <div className="text-sm font-mono">
+                            {String(groupDetails.epoch)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          Members ({groupDetails.members.length})
+                        </div>
+                        <div className="space-y-1">
+                          {groupDetails.members.map((pk) => (
+                            <div
+                              key={pk}
+                              className="text-xs font-mono truncate border rounded px-2 py-1"
+                              title={pk}
+                            >
+                              {pk}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          ClientState (JSON)
+                        </div>
+                        <pre className="text-xs whitespace-pre-wrap break-words border rounded p-3 bg-muted/30">
+                          {jsonStringifySafe(groupDetails.state)}
+                        </pre>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" disabled={!isAdmin}>
+                  Invite member
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite member</DialogTitle>
+                  <DialogDescription>
+                    Choose a contact and a KeyPackage event (kind 443) to send a
+                    Welcome.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {!isAdmin && (
+                    <Alert variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Only group admins can invite members.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Contact</Label>
+                    <Select
+                      value={inviteContactPubkey}
+                      onValueChange={(v) => {
+                        setInviteContactPubkey(v);
+                        setSelectedKeyPackageEventId("");
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a contact" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contactOptions.map((c) => (
+                          <SelectItem key={c.pubkey} value={c.pubkey}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>KeyPackage event</Label>
+                    <Select
+                      value={selectedKeyPackageEventId}
+                      onValueChange={setSelectedKeyPackageEventId}
+                      disabled={!inviteContactPubkey}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select KeyPackage event" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(contactKeyPackages ?? []).map((e) => (
+                          <SelectItem key={e.id} value={e.id}>
+                            {e.id.slice(0, 16)}... (
+                            {new Date(e.created_at * 1000).toLocaleString()})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {inviteError && (
+                    <Alert variant="destructive">
+                      <XCircle className="h-4 w-4" />
+                      <AlertDescription>{inviteError}</AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    onClick={handleInvite}
+                    disabled={!isAdmin || isInviting}
+                  >
+                    {isInviting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Inviting...
+                      </>
+                    ) : (
+                      "Send invite"
+                    )}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        }
       />
 
       {/* Main chat container */}

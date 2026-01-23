@@ -84,10 +84,20 @@ export function NewRelayForm({
 
   const handleAdd = async (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
+
+    const trimmed = newRelay.trim();
+    if (!trimmed) return;
+
     setAdding(true);
-    await onAdd(ensureWebSocketURL(newRelay.trim()));
-    setNewRelay("");
-    setAdding(false);
+    try {
+      await onAdd(ensureWebSocketURL(trimmed));
+      setNewRelay("");
+    } catch (err) {
+      // Keep the input enabled even if adding fails, so the user can try again.
+      console.error("Failed to add relay:", err);
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (

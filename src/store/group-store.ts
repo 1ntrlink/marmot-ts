@@ -112,6 +112,15 @@ export class GroupStore {
   async remove(groupId: Uint8Array | string): Promise<void> {
     const key = this.resolveStorageKey(groupId);
     await this.backend.removeItem(key);
+
+    // Notify about the change if callback provided.
+    // Note: remove() previously did not emit updates, which caused UIs using
+    // onUpdate/storeChanges to not refresh when a group was deleted.
+    if (this.onUpdate) {
+      const groupIdHex =
+        typeof groupId === "string" ? groupId : bytesToHex(groupId);
+      this.onUpdate(groupIdHex);
+    }
   }
 
   /**

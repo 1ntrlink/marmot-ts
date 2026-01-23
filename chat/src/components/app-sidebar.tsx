@@ -12,11 +12,16 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { user$ } from "@/lib/accounts";
+import {
+  getGroupSubscriptionManager,
+  getInvitesUnreadCount$,
+} from "@/lib/runtime";
 import { use$ } from "applesauce-react/hooks";
 import {
   Command,
   KeyIcon,
   MessageSquareIcon,
+  InboxIcon,
   QrCodeIcon,
   Settings,
   ToolCaseIcon,
@@ -32,6 +37,11 @@ const topLevelNav = [
     title: "Groups",
     url: "/groups",
     icon: MessageSquareIcon,
+  },
+  {
+    title: "Invites",
+    url: "/invites",
+    icon: InboxIcon,
   },
   {
     title: "Contacts",
@@ -67,6 +77,10 @@ export function AppSidebar({
 
   const { setOpen } = useSidebar();
   const user = use$(user$);
+  const invitesUnread = use$(getInvitesUnreadCount$() ?? undefined);
+  const groupsUnread = use$(
+    getGroupSubscriptionManager()?.unreadGroupIds$ ?? undefined,
+  );
   const [qrOpen, setQrOpen] = React.useState(false);
 
   return (
@@ -117,7 +131,17 @@ export function AppSidebar({
                       isActive={location.pathname.startsWith(item.url)}
                       className="px-2.5 md:px-2"
                     >
-                      <item.icon />
+                      <span className="relative">
+                        <item.icon />
+                        {item.url === "/groups" &&
+                          (groupsUnread?.length ?? 0) > 0 && (
+                            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                        {item.url === "/invites" &&
+                          (invitesUnread ?? 0) > 0 && (
+                            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                      </span>
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
