@@ -10,15 +10,18 @@ import {
 import {
   ensureHttpURL,
   ensureWebSocketURL,
+  kinds,
   relaySet,
 } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
 import { Loader2Icon, WifiIcon, WifiOffIcon } from "lucide-react";
 import { useMemo, useState } from "react";
-import { PageBody } from "../../components/page-body";
-import { PageHeader } from "../../components/page-header";
-import { actions, user$ } from "../../lib/accounts";
-import { pool } from "../../lib/nostr";
+
+import { EventStatusButton } from "@/components/event-status-button";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import { actions, user$ } from "@/lib/accounts";
+import { pool } from "@/lib/nostr";
 
 export function RelayItem({
   relay,
@@ -81,10 +84,20 @@ export function NewRelayForm({
 
   const handleAdd = async (e?: React.FormEvent<HTMLFormElement>) => {
     e?.preventDefault();
+
+    const trimmed = newRelay.trim();
+    if (!trimmed) return;
+
     setAdding(true);
-    await onAdd(ensureWebSocketURL(newRelay.trim()));
-    setNewRelay("");
-    setAdding(false);
+    try {
+      await onAdd(ensureWebSocketURL(trimmed));
+      setNewRelay("");
+    } catch (err) {
+      // Keep the input enabled even if adding fails, so the user can try again.
+      console.error("Failed to add relay:", err);
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -268,6 +281,9 @@ function ExtraRelaysSection() {
 }
 
 export default function SettingsRelaysPage() {
+  const user = use$(user$);
+  const relayList = use$(() => user?.replaceable(kinds.RelayList), []);
+
   return (
     <>
       <PageHeader
@@ -276,6 +292,7 @@ export default function SettingsRelaysPage() {
           { label: "Settings", to: "/settings" },
           { label: "Relays" },
         ]}
+        actions={relayList && <EventStatusButton event={relayList} />}
       />
       <PageBody>
         <LookupRelaysSection />

@@ -1,28 +1,24 @@
-import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
-import { useState, useEffect, useRef } from "react";
-import {
-  createMarmotGroupData,
-  decodeMarmotGroupData,
-} from "../../../../src/core/marmot-group-data";
-import { extraRelays$ } from "@/lib/settings";
 import { use$ } from "applesauce-react/hooks";
 import { AlertCircle, Copy } from "lucide-react";
+import { createMarmotGroupData, decodeMarmotGroupData } from "marmot-ts";
+import { useEffect, useRef, useState } from "react";
 
-import { PageHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { extraRelays$ } from "@/lib/settings";
+import { bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
 // ============================================================================
 // Main Component
 // ============================================================================

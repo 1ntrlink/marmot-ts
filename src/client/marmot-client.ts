@@ -1,9 +1,11 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
+import { Rumor } from "applesauce-common/helpers/gift-wrap";
 import { EventSigner } from "applesauce-core";
 import {
   Capabilities,
   ClientState,
   CryptoProvider,
+  defaultCryptoProvider,
   getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
@@ -11,7 +13,6 @@ import {
   makePskIndex,
   PrivateKeyPackage,
 } from "ts-mls";
-import { makeKeyPackageRef } from "ts-mls/keyPackage.js";
 import {
   CiphersuiteId,
   CiphersuiteName,
@@ -21,12 +22,11 @@ import { createCredential } from "../core/credential.js";
 import { defaultCapabilities } from "../core/default-capabilities.js";
 import { createSimpleGroup, SimpleGroupOptions } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";
+import { getWelcome } from "../core/welcome.js";
 import { GroupStore } from "../store/group-store.js";
 import { KeyPackageStore } from "../store/key-package-store.js";
-import { NostrNetworkInterface } from "./nostr-interface.js";
 import { MarmotGroup } from "./group/marmot-group.js";
-import { getWelcome } from "../core/welcome.js";
-import { Rumor } from "applesauce-common/helpers";
+import { NostrNetworkInterface } from "./nostr-interface.js";
 
 export type MarmotClientOptions = {
   /** The signer used for the clients identity */
@@ -56,7 +56,7 @@ export class MarmotClient {
   readonly network: NostrNetworkInterface;
 
   /** Crypto provider for cryptographic operations */
-  public cryptoProvider?: CryptoProvider;
+  public cryptoProvider: CryptoProvider;
 
   /** Internal store for group classes */
   private groups = new Map<string, MarmotGroup>();
@@ -67,7 +67,7 @@ export class MarmotClient {
     this.groupStore = options.groupStore;
     this.keyPackageStore = options.keyPackageStore;
     this.network = options.network;
-    this.cryptoProvider = options.cryptoProvider;
+    this.cryptoProvider = options.cryptoProvider ?? defaultCryptoProvider;
   }
 
   /** Get a ciphersuite implementation from a name or id */
@@ -203,34 +203,29 @@ export class MarmotClient {
 
     // Collect all key packages with matching cipher suite and compute their KeyPackageRef
     // KeyPackageRef is used to identify which encrypted secret in the welcome is ours (RFC 9420)
-    for (const publicPackage of allKeyPackages) {
-      if (publicPackage.cipherSuite !== welcome.cipherSuite) {
+    for (const keyPackage of allKeyPackages) {
+      if (keyPackage.publicPackage.cipherSuite !== welcome.cipherSuite)
         continue;
-      }
 
-      const completePackage =
-        await this.keyPackageStore.getCompletePackage(publicPackage);
-      if (!completePackage) {
-        continue;
-      }
-
-      // Compute KeyPackageRef for this key package
-      const keyPackageRef = await makeKeyPackageRef(
-        completePackage.publicPackage,
-        ciphersuiteImpl.hash,
+      const privatekeyPackage = await this.keyPackageStore.getPrivateKey(
+        keyPackage.keyPackageRef,
       );
+      if (!privatekeyPackage) continue;
 
       // Check if this key package's ref matches any secret in the welcome
       // This is the RFC 9420 KeyPackageRef matching semantics
       const hasMatchingSecret = welcome.secrets.some(
         (secret) =>
-          secret.newMember.length === keyPackageRef.length &&
-          secret.newMember.every((val, idx) => val === keyPackageRef[idx]),
+          secret.newMember.length === keyPackage.keyPackageRef.length &&
+          secret.newMember.every(
+            (val, idx) => val === keyPackage.keyPackageRef[idx],
+          ),
       );
 
       candidatePackages.push({
-        ...completePackage,
-        keyPackageRef,
+        publicPackage: keyPackage.publicPackage,
+        privatePackage: privatekeyPackage,
+        keyPackageRef: keyPackage.keyPackageRef,
         hasMatchingSecret,
       });
     }

@@ -95,11 +95,7 @@ export function createKeyPackageRelayListEvent(
     .filter((relay) => relay.trim().length > 0 && URL.canParse(relay))
     .map(normalizeRelayUrl);
 
-  if (validRelays.length === 0) {
-    throw new Error("At least one valid relay URL is required");
-  }
-
-  // Build tags
+  // Build tags (empty array allowed - users can have no key package relays)
   const tags: string[][] = validRelays.map((relay) => [
     KEY_PACKAGE_RELAY_LIST_RELAY_TAG,
     relay,

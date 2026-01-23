@@ -4,6 +4,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import "./index.css";
 
+import "@/lib/runtime";
+
 import { ThemeProvider } from "./components/theme-providers";
 import { SidebarProvider } from "./components/ui/sidebar";
 
@@ -11,7 +13,10 @@ import ContactsIndexPage from "./pages/contacts/index.tsx";
 import ContactsPage from "./pages/contacts.tsx";
 import ContactDetailPage from "./pages/contacts/[npub].tsx";
 import GroupsPage from "./pages/groups.tsx";
+import CreateGroupPage from "./pages/groups/create.tsx";
+import GroupDetailPage from "./pages/groups/[id].tsx";
 import HomePage from "./pages/index.tsx";
+import InvitesPage from "./pages/invites.tsx";
 import KeyPackagePage from "./pages/key-packages.tsx";
 import KeyPackageDetailPage from "./pages/key-packages/[id].tsx";
 import CreateKeyPackagePage from "./pages/key-packages/create.tsx";
@@ -21,6 +26,11 @@ import SettingsAccountsPage from "./pages/settings/accounts.tsx";
 import MarmotSettingsPage from "./pages/settings/marmot";
 import SettingsRelaysPage from "./pages/settings/relays.tsx";
 import SignInPage from "./pages/signin.tsx";
+import SignInIndexPage from "./pages/signin/index.tsx";
+import SignInNewUserPage from "./pages/signin/create.tsx";
+import SignInExtensionPage from "./pages/signin/extension.tsx";
+import SignInBunkerPage from "./pages/signin/bunker.tsx";
+import SignInQRPage from "./pages/signin/connect-qr.tsx";
 import ToolsPage from "./pages/tools";
 import KeyPackageDecoderPage from "./pages/tools/key-package-encoding.tsx";
 import GroupMetadataEncodingPage from "./pages/tools/group-metadata-encoding.tsx";
@@ -39,12 +49,22 @@ createRoot(document.getElementById("root")!).render(
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<HomePage />} />
-            <Route path="/groups" element={<GroupsPage />}></Route>
+            <Route path="/groups" element={<GroupsPage />}>
+              <Route path="create" element={<CreateGroupPage />} />
+              <Route path=":id" element={<GroupDetailPage />} />
+            </Route>
+            <Route path="/invites" element={<InvitesPage />} />
             <Route path="/key-packages" element={<KeyPackagePage />}>
               <Route path="create" element={<CreateKeyPackagePage />} />
               <Route path=":id" element={<KeyPackageDetailPage />} />
             </Route>
-            <Route path="/signin" element={<SignInPage />} />
+            <Route path="/signin" element={<SignInPage />}>
+              <Route index element={<SignInIndexPage />} />
+              <Route path="new-user" element={<SignInNewUserPage />} />
+              <Route path="extension" element={<SignInExtensionPage />} />
+              <Route path="bunker" element={<SignInBunkerPage />} />
+              <Route path="qr" element={<SignInQRPage />} />
+            </Route>
             <Route path="/contacts" element={<ContactsPage />}>
               <Route path=":npub" element={<ContactDetailPage />} />
               <Route index element={<ContactsIndexPage />} />

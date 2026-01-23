@@ -1,3 +1,11 @@
+import { CreateProfile, UpdateProfile } from "applesauce-actions/actions";
+import { use$ } from "applesauce-react/hooks";
+import ISO6391 from "iso-639-1";
+import { useEffect, useState } from "react";
+
+import { EventStatusButton } from "@/components/event-status-button";
+import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,14 +25,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CreateProfile, UpdateProfile } from "applesauce-actions/actions";
-import { use$ } from "applesauce-react/hooks";
-import ISO6391 from "iso-639-1";
-import { useEffect, useState } from "react";
-import { actions, user$ } from "../../lib/accounts";
-import { EventStatusButton } from "@/components/event-status-button";
-import { PageBody } from "../../components/page-body";
-import { PageHeader } from "../../components/page-header";
+import { actions, user$ } from "@/lib/accounts";
 
 export default function SettingsAccountPage() {
   const profile = use$(user$.profile$);
@@ -41,7 +42,6 @@ export default function SettingsAccountPage() {
   // Initialize form state from profile
   useEffect(() => {
     if (profile) {
-      console.log("Profile:", profile);
       setName(profile.name ?? "");
       setAbout(profile.about ?? "");
       setPicture(profile.picture ?? "");

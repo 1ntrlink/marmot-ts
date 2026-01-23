@@ -6,16 +6,23 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
-  SidebarInput,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { user$ } from "@/lib/accounts";
+import {
+  getGroupSubscriptionManager,
+  getInvitesUnreadCount$,
+} from "@/lib/runtime";
+import { use$ } from "applesauce-react/hooks";
 import {
   Command,
   KeyIcon,
   MessageSquareIcon,
+  InboxIcon,
+  QrCodeIcon,
   Settings,
   ToolCaseIcon,
   UsersIcon,
@@ -23,12 +30,18 @@ import {
 import * as React from "react";
 import { type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
+import QRModal from "./qr-modal";
 
 const topLevelNav = [
   {
     title: "Groups",
     url: "/groups",
     icon: MessageSquareIcon,
+  },
+  {
+    title: "Invites",
+    url: "/invites",
+    icon: InboxIcon,
   },
   {
     title: "Contacts",
@@ -63,6 +76,12 @@ export function AppSidebar({
   const navigate = useNavigate();
 
   const { setOpen } = useSidebar();
+  const user = use$(user$);
+  const invitesUnread = use$(getInvitesUnreadCount$() ?? undefined);
+  const groupsUnread = use$(
+    getGroupSubscriptionManager()?.unreadGroupIds$ ?? undefined,
+  );
+  const [qrOpen, setQrOpen] = React.useState(false);
 
   return (
     <Sidebar
@@ -112,7 +131,17 @@ export function AppSidebar({
                       isActive={location.pathname.startsWith(item.url)}
                       className="px-2.5 md:px-2"
                     >
-                      <item.icon />
+                      <span className="relative">
+                        <item.icon />
+                        {item.url === "/groups" &&
+                          (groupsUnread?.length ?? 0) > 0 && (
+                            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                        {item.url === "/invites" &&
+                          (invitesUnread ?? 0) > 0 && (
+                            <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-destructive" />
+                          )}
+                      </span>
                       <span>{item.title}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
@@ -123,6 +152,21 @@ export function AppSidebar({
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
+            {user && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  tooltip={{
+                    children: "Invite QR Code",
+                    hidden: false,
+                  }}
+                  onClick={() => setQrOpen(true)}
+                  className="px-2.5 md:px-2"
+                >
+                  <QrCodeIcon />
+                  <span>Invite QR Code</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
             <SidebarMenuItem>
               <SidebarMenuButton
                 tooltip={{
@@ -138,6 +182,9 @@ export function AppSidebar({
             </SidebarMenuItem>
           </SidebarMenu>
           <NavUser />
+          {user && (
+            <QRModal data={user.npub} open={qrOpen} onOpenChange={setQrOpen} />
+          )}
         </SidebarFooter>
       </Sidebar>
 
@@ -152,10 +199,9 @@ export function AppSidebar({
             <div className="text-foreground text-base font-medium">{title}</div>
             {actions}
           </div>
-          {!children && <SidebarInput placeholder="Type to search..." />}
         </SidebarHeader>
         <SidebarContent>
-          <SidebarGroup className="px-0">
+          <SidebarGroup className="p-0">
             <SidebarGroupContent>{children}</SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
@@ -163,20 +209,3 @@ export function AppSidebar({
     </Sidebar>
   );
 }
-
-// const coolGroupNavItem = (
-//   <a
-//     href="#"
-//     key={title}
-//     className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground flex flex-col items-start gap-2 border-b p-4 text-sm leading-tight whitespace-nowrap last:border-b-0"
-//   >
-//     <div className="flex w-full items-center gap-2">
-//       <span>{mail.name}</span>{" "}
-//       <span className="ml-auto text-xs">{mail.date}</span>
-//     </div>
-//     <span className="font-medium">{mail.subject}</span>
-//     <span className="line-clamp-2 w-[260px] text-xs whitespace-break-spaces">
-//       {mail.teaser}
-//     </span>
-//   </a>
-// );

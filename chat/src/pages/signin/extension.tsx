@@ -3,13 +3,16 @@ import { Button } from "@/components/ui/button";
 import { ExtensionAccount } from "applesauce-accounts/accounts";
 import { ExtensionSigner } from "applesauce-signers";
 import { useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import accountManager from "../../lib/accounts";
 
 interface ExtensionSignInProps {
   onSuccess?: () => void;
 }
 
-export default function ExtensionSignIn({ onSuccess }: ExtensionSignInProps) {
+export default function ExtensionTab({ onSuccess }: ExtensionSignInProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,8 +43,13 @@ export default function ExtensionSignIn({ onSuccess }: ExtensionSignInProps) {
       // Set it as the active account
       accountManager.setActive(account.id);
 
-      // Call success callback
-      onSuccess?.();
+      // Call success callback or navigate
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        const from = (location.state as any)?.from ?? "/";
+        navigate(from);
+      }
     } catch (err) {
       console.error("Sign in error:", err);
       setError(err instanceof Error ? err.message : "Failed to sign in");
