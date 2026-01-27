@@ -1,4 +1,10 @@
 packages:
-  - "."
-  - "chat"
-  - "examples"
+  - .
+  - chat
+  - examples
+
+ignoredBuiltDependencies:
+  - msw
+
+onlyBuiltDependencies:
+  - esbuild

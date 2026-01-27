@@ -1,6 +1,6 @@
 import { getDisplayName, getProfilePicture } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
-import { ChevronsUpDown, LogOutIcon, PlusIcon } from "lucide-react";
+import { ChevronsUpDown, LogOutIcon, PlusIcon, UserIcon } from "lucide-react";
 import { useNavigate } from "react-router";
 import accountManager from "../lib/accounts";
 import { eventStore } from "../lib/nostr";
@@ -98,7 +98,7 @@ export default function NavUser() {
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton className="w-full" onClick={handleSignIn}>
-            Sign In
+            <UserIcon />
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>
