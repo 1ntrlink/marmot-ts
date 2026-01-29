@@ -1,10 +1,12 @@
 import type { Rumor } from "applesauce-common/helpers/gift-wrap";
-import { bytesToHex } from "applesauce-core/helpers";
+import {
+  bytesToHex,
+  Filter,
+  matchFilter,
+  NostrEvent,
+} from "applesauce-core/helpers";
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
-import type {
-  GroupHistoryStoreFilter,
-  MarmotGroupHistoryStoreBackend,
-} from "marmot-ts/store";
+import { GroupRumorHistoryBackend } from "marmot-ts/store";
 
 const DB_VERSION = 1;
 const STORE_NAME = "rumors";
@@ -29,8 +31,9 @@ interface GroupHistoryDB extends DBSchema {
  * IndexedDB-backed implementation of {@link MarmotGroupHistoryStoreBackend}.
  * Stores and retrieves group history (MIP-03 rumors) using the `idb` package.
  */
-export class IdbGroupHistoryStore implements MarmotGroupHistoryStoreBackend {
+export class IdbRumorStore implements GroupRumorHistoryBackend {
   private name: string;
+  private groupKey: string;
 
   private dbPromise: Promise<IDBPDatabase<GroupHistoryDB>> | null = null;
   private async getDB(): Promise<IDBPDatabase<GroupHistoryDB>> {
@@ -47,32 +50,30 @@ export class IdbGroupHistoryStore implements MarmotGroupHistoryStoreBackend {
     return this.dbPromise;
   }
 
-  constructor(name: string) {
+  constructor(name: string, groupId: Uint8Array) {
     this.name = name;
+    this.groupKey = bytesToHex(groupId);
   }
 
-  async getRumors(
-    groupId: Uint8Array,
-    filter: GroupHistoryStoreFilter,
-  ): Promise<Rumor[]> {
+  /** Load rumors from the indexeddb database based on the given filter */
+  async queryRumors(filter: Filter): Promise<Rumor[]> {
     const db = await this.getDB();
-    const groupKey = bytesToHex(groupId);
     const { since, until, limit } = filter;
 
     let range: IDBKeyRange;
     if (since !== undefined && until !== undefined) {
       range = IDBKeyRange.bound(
-        [groupKey, since],
-        [groupKey, until],
+        [this.groupKey, since],
+        [this.groupKey, until],
         false,
         false,
       );
     } else if (since !== undefined) {
-      range = IDBKeyRange.lowerBound([groupKey, since], false);
+      range = IDBKeyRange.lowerBound([this.groupKey, since], false);
     } else if (until !== undefined) {
-      range = IDBKeyRange.upperBound([groupKey, until], false);
+      range = IDBKeyRange.upperBound([this.groupKey, until], false);
     } else {
-      range = IDBKeyRange.lowerBound([groupKey, 0]);
+      range = IDBKeyRange.lowerBound([this.groupKey, 0]);
     }
 
     const tx = db.transaction(STORE_NAME, "readonly");
@@ -84,14 +85,19 @@ export class IdbGroupHistoryStore implements MarmotGroupHistoryStoreBackend {
       stored.push(cur.value as StoredRumor);
       cur = await cur.continue();
     }
-    return stored.map((s) => s.rumor);
+
+    return (
+      stored
+        .map((s) => s.rumor)
+        // Filter down by extra nostr filters if provided
+        .filter((r) => matchFilter(filter, r as NostrEvent))
+    );
   }
 
-  async addRumor(groupId: Uint8Array, message: Rumor): Promise<void> {
+  async addRumor(message: Rumor): Promise<void> {
     const db = await this.getDB();
-    const groupKey = bytesToHex(groupId);
     const entry: StoredRumor = {
-      groupId: groupKey,
+      groupId: this.groupKey,
       created_at: message.created_at,
       id: message.id,
       rumor: message,

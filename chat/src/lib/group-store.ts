@@ -1,8 +1,8 @@
 import localforage from "localforage";
 import {
   defaultMarmotClientConfig,
+  GroupRumorHistory,
   GroupStore,
-  MarmotGroupHistoryStore,
 } from "marmot-ts";
 import {
   BehaviorSubject,
@@ -13,7 +13,7 @@ import {
   switchMap,
 } from "rxjs";
 import accountManager from "./accounts";
-import { IdbGroupHistoryStore } from "./idb-group-history";
+import { IdbRumorStore } from "./idb-rumor-store";
 
 // Observable that triggers whenever the store changes
 const storeChanges$ = new BehaviorSubject<number>(0);
@@ -47,8 +47,9 @@ export const groupHistoryStore$ = accountManager.active$.pipe(
   map(
     (account) =>
       account &&
-      MarmotGroupHistoryStore.makeGroupHistoryInterface(
-        new IdbGroupHistoryStore(`${account?.pubkey}-group-history`),
+      GroupRumorHistory.makeFactory(
+        (groupId) =>
+          new IdbRumorStore(`${account?.pubkey}-group-history`, groupId),
       ),
   ),
   // Only create a single instance of the group history store

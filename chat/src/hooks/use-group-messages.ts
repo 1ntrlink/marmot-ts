@@ -1,5 +1,5 @@
 import type { Rumor } from "applesauce-common/helpers/gift-wrap";
-import { type MarmotGroup, type MarmotGroupHistoryStore } from "marmot-ts";
+import { type MarmotGroup, type GroupRumorHistory } from "marmot-ts";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 /**
@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
  * ```
  */
 export function useGroupMessages(
-  group: MarmotGroup<MarmotGroupHistoryStore> | null,
+  group: MarmotGroup<GroupRumorHistory> | null,
 ): {
   messages: Rumor[];
   loadMoreMessages: () => Promise<void>;
@@ -31,7 +31,7 @@ export function useGroupMessages(
 
   const paginatedLoader = useMemo(() => {
     if (!group?.history) return null;
-    return group.history.createPaginatedLoader(50);
+    return group.history.createPaginatedLoader({ limit: 50 });
   }, [group]);
 
   const addNewMessages = useCallback((newMessages: Rumor[]) => {

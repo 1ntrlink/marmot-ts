@@ -8,7 +8,7 @@ import {
   getGroupMembers,
   getNostrGroupIdHex,
   MarmotGroup,
-  MarmotGroupHistoryStore,
+  GroupRumorHistory,
   unixNow,
 } from "marmot-ts";
 import { getEventHash } from "nostr-tools";
@@ -200,7 +200,7 @@ function MessageInput({
 // Hook: useMessageSender
 // ============================================================================
 
-function useMessageSender(group: MarmotGroup<MarmotGroupHistoryStore> | null) {
+function useMessageSender(group: MarmotGroup<any> | null) {
   const account = accountManager.active;
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);

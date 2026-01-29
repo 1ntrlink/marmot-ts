@@ -47,10 +47,15 @@ import { NostrNetworkInterface, PublishResponse } from "../nostr-interface.js";
 import { proposeInviteUser } from "./proposals/invite-user.js";
 
 /** The minimum interface for a group to store its message history */
-export interface GroupHistoryStore {
+export interface BaseGroupHistory {
   /** Saves a new application message to the group history */
   saveMessage(groupId: Uint8Array, message: Uint8Array): Promise<void>;
 }
+
+/** A factory function that creates a {@link BaseGroupHistory} instance for a group id */
+export type GroupHistoryFactory<
+  THistory extends BaseGroupHistory | undefined = undefined,
+> = (groupId: Uint8Array) => THistory;
 
 export type ProposalContext = {
   state: ClientState;
@@ -70,7 +75,7 @@ export type ProposalBuilder<
 > = (...args: Args) => ProposalAction<T>;
 
 export type MarmotGroupOptions<
-  HistoryStore extends GroupHistoryStore | undefined,
+  THistory extends BaseGroupHistory | undefined = undefined,
 > = {
   /** The backend to store and load of group from */
   store: GroupStore;
@@ -81,7 +86,7 @@ export type MarmotGroupOptions<
   /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
   network: NostrNetworkInterface;
   /** The storage interface for the groups application message history */
-  history: HistoryStore | ((groupId: Uint8Array) => HistoryStore);
+  history: THistory | GroupHistoryFactory<THistory>;
 };
 
 /** Information about a welcome recipient */
@@ -134,7 +139,13 @@ export function createAdminCommitPolicyCallback(args: {
   };
 }
 
-export class MarmotGroup<THistoryStore extends GroupHistoryStore | undefined> {
+/**
+ * The main class for interacting with a MLS group
+ * @template THistory - The type of the history store to use for the group, must implement the {@link BaseGroupHistory} interface. (Default is no history store)
+ */
+export class MarmotGroup<
+  THistory extends BaseGroupHistory | undefined = undefined,
+> {
   /** The backend to store and load of group from */
   readonly store: GroupStore;
 
@@ -148,7 +159,7 @@ export class MarmotGroup<THistoryStore extends GroupHistoryStore | undefined> {
   readonly network: NostrNetworkInterface;
 
   /** The storage interface for the groups application message history */
-  readonly history: THistoryStore;
+  readonly history: THistory;
 
   /** Whether group state has been modified */
   dirty = false;
@@ -192,7 +203,7 @@ export class MarmotGroup<THistoryStore extends GroupHistoryStore | undefined> {
     return this.groupData?.relays;
   }
 
-  constructor(state: ClientState, options: MarmotGroupOptions<THistoryStore>) {
+  constructor(state: ClientState, options: MarmotGroupOptions<THistory>) {
     this._state = state;
     this.store = options.store;
     this.signer = options.signer;
@@ -206,12 +217,12 @@ export class MarmotGroup<THistoryStore extends GroupHistoryStore | undefined> {
   }
 
   /** Loads a group from the store */
-  static async load<THistoryStore extends GroupHistoryStore | undefined>(
+  static async load<THistory extends BaseGroupHistory | undefined = undefined>(
     groupId: Uint8Array | string,
-    options: Omit<MarmotGroupOptions<THistoryStore>, "ciphersuite"> & {
+    options: Omit<MarmotGroupOptions<THistory>, "ciphersuite"> & {
       cryptoProvider?: CryptoProvider;
     },
-  ): Promise<MarmotGroup<THistoryStore>> {
+  ): Promise<MarmotGroup<THistory>> {
     const state = await options.store.get(groupId);
     if (!state) throw new Error(`Group ${groupId} not found`);
 
