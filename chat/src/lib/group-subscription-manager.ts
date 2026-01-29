@@ -6,7 +6,6 @@ import {
   GROUP_EVENT_KIND,
   MarmotClient,
   MarmotGroup,
-  MarmotGroupHistoryStore,
 } from "marmot-ts";
 import { BehaviorSubject, Subscription } from "rxjs";
 
@@ -27,7 +26,7 @@ export class GroupSubscriptionManager {
     }
   >();
 
-  private readonly client: MarmotClient<MarmotGroupHistoryStore>;
+  private readonly client: MarmotClient;
   private isActive = false;
   private reconcileInterval: ReturnType<typeof setInterval> | null = null;
   private applicationMessageCallbacks = new Map<
@@ -47,7 +46,7 @@ export class GroupSubscriptionManager {
   /** Last seen timestamp per group (seconds), persisted in localStorage. */
   private lastSeenAtByGroup = new Map<string, number>();
 
-  constructor(client: MarmotClient<MarmotGroupHistoryStore>) {
+  constructor(client: MarmotClient) {
     this.client = client;
   }
 
@@ -224,7 +223,7 @@ export class GroupSubscriptionManager {
 
   private async processEvents(
     groupIdHex: string,
-    group: MarmotGroup<MarmotGroupHistoryStore>,
+    group: MarmotGroup,
     events: NostrEvent[],
     seenEventIds: Set<string>,
   ): Promise<void> {
@@ -288,7 +287,7 @@ export class GroupSubscriptionManager {
   private async fetchHistoricalEvents(
     groupIdHex: string,
     relays: string[],
-    group: MarmotGroup<MarmotGroupHistoryStore>,
+    group: MarmotGroup,
     seenEventIds: Set<string>,
   ): Promise<void> {
     try {

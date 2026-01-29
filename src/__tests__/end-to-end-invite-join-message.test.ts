@@ -70,7 +70,6 @@ describe("End-to-end: invite, join, first message", () => {
       keyPackageStore,
       signer: adminAccount.signer,
       network: mockNetwork,
-      groupHistory: undefined,
     });
 
     inviteeClient = new MarmotClient({
@@ -81,7 +80,6 @@ describe("End-to-end: invite, join, first message", () => {
       keyPackageStore: new KeyPackageStore(new MemoryBackend()),
       signer: inviteeAccount.signer,
       network: mockNetwork,
-      groupHistory: undefined,
     });
   });
 

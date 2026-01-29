@@ -1,8 +1,8 @@
 import type { Rumor } from "applesauce-common/helpers/gift-wrap";
 import type { Filter } from "applesauce-core/helpers/filter";
 import { EventEmitter } from "eventemitter3";
-import { BaseGroupHistory, GroupHistoryFactory } from "../client/index.js";
-import { deserializeApplicationRumor } from "../core/group-message.js";
+import { BaseGroupHistory, GroupHistoryFactory } from "../index.js";
+import { deserializeApplicationRumor } from "../../core/group-message.js";
 
 /** A rumor storage interface for the {@link GroupRumorHistory} class */
 export interface GroupRumorHistoryBackend {
@@ -17,7 +17,7 @@ type GroupRumorHistoryEvents = {
   rumor: (rumor: Rumor) => void;
 };
 
-/** A {@link BaseGroupHistory} implementation that only stores the parsed rumor events from a group */
+/** A group.history implementation that stores the parsed rumor events for a group and provies methods for querying */
 export class GroupRumorHistory
   extends EventEmitter<GroupRumorHistoryEvents>
   implements BaseGroupHistory

@@ -2,6 +2,7 @@ import { defined, mapEventsToTimeline, simpleTimeout } from "applesauce-core";
 import { NostrEvent } from "applesauce-core/helpers/event";
 import { onlyEvents } from "applesauce-relay";
 import {
+  GroupRumorHistory,
   MarmotClient,
   NostrNetworkInterface,
   PublishResponse,
@@ -15,7 +16,8 @@ import {
   startWith,
 } from "rxjs";
 import accounts from "./accounts";
-import { groupHistoryStore$, groupStore$ } from "./group-store";
+import { groupStore$ } from "./group-store";
+import { IdbRumorBackend } from "./idb-rumor-backend";
 import { keyPackageStore$ } from "./key-package-store";
 import { eventStore, pool } from "./nostr";
 
@@ -61,24 +63,28 @@ export const marmotClient$ = combineLatest([
   accounts.active$,
   groupStore$,
   keyPackageStore$,
-  groupHistoryStore$,
 ]).pipe(
-  map(
-    ([account, groupStore, keyPackageStore, groupHistoryStore]) =>
-      // Ensure all stores are created and setup
-      account &&
-      groupStore &&
-      keyPackageStore &&
-      groupHistoryStore &&
-      // Create a new marmot client for the active account
-      new MarmotClient({
-        signer: account.signer,
-        groupStore,
-        keyPackageStore,
-        network: networkInterface,
-        groupHistory: groupHistoryStore,
-      }),
-  ),
+  map(([account, groupStore, keyPackageStore]) => {
+    // Ensure all stores are created and setup
+    if (!account || !groupStore || !keyPackageStore) return;
+
+    // Create a history factory scoped to the active account
+    const historyFactory = (groupId: Uint8Array) =>
+      // Create a new class that stores the rumor events
+      new GroupRumorHistory(
+        // Give it an indexeddb backend
+        new IdbRumorBackend(`${account?.pubkey}-group-history`, groupId),
+      );
+
+    // Create a new marmot client for the active account
+    return new MarmotClient({
+      signer: account.signer,
+      groupStore,
+      keyPackageStore,
+      network: networkInterface,
+      historyFactory,
+    });
+  }),
   startWith(undefined),
   shareReplay(1),
 );

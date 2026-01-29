@@ -27,37 +27,37 @@ import { GroupStore } from "../store/group-store.js";
 import { KeyPackageStore } from "../store/key-package-store.js";
 import {
   BaseGroupHistory,
+  GroupHistoryFactory,
   MarmotGroup,
-  MarmotGroupOptions,
 } from "./group/marmot-group.js";
 import { NostrNetworkInterface } from "./nostr-interface.js";
 
-export type MarmotClientOptions<
-  THistory extends BaseGroupHistory | undefined = undefined,
-> = {
-  /** The signer used for the clients identity */
-  signer: EventSigner;
-  /** The capabilities to use for the client */
-  capabilities?: Capabilities;
-  /** The backend to store and load the groups from */
-  groupStore: GroupStore;
-  /** The backend to store and load the key packages from */
-  keyPackageStore: KeyPackageStore;
-  /** The crypto provider to use for cryptographic operations */
-  cryptoProvider?: CryptoProvider;
-  /** The nostr relay pool to use for the client. Should implement GroupNostrInterface for group operations. */
-  network: NostrNetworkInterface;
-  /** The group history interface to be passed to group instaces */
-  groupHistory: MarmotGroupOptions<THistory>["history"];
-};
+export type MarmotClientOptions<THistory extends BaseGroupHistory | undefined> =
+  {
+    /** The signer used for the clients identity */
+    signer: EventSigner;
+    /** The capabilities to use for the client */
+    capabilities?: Capabilities;
+    /** The backend to store and load the groups from */
+    groupStore: GroupStore;
+    /** The backend to store and load the key packages from */
+    keyPackageStore: KeyPackageStore;
+    /** The crypto provider to use for cryptographic operations */
+    cryptoProvider?: CryptoProvider;
+    /** The nostr relay pool to use for the client. Should implement GroupNostrInterface for group operations. */
+    network: NostrNetworkInterface;
+  } & (THistory extends undefined
+    ? {}
+    : {
+        /** The group history interface to be passed to group instaces */
+        historyFactory: GroupHistoryFactory<THistory>;
+      });
 
 /** Given a MarmotClient type, returns the MarmotGroup class type with the same THistory. */
 export type InferGroupType<TClient extends MarmotClient<any>> =
   TClient extends MarmotClient<infer THistory> ? MarmotGroup<THistory> : never;
 
-export class MarmotClient<
-  THistory extends BaseGroupHistory | undefined = undefined,
-> {
+export class MarmotClient<THistory extends BaseGroupHistory | undefined = any> {
   /** The signer used for the clients identity */
   readonly signer: EventSigner;
   /** The capabilities to use for the client */
@@ -76,7 +76,7 @@ export class MarmotClient<
   private groups = new Map<string, MarmotGroup<THistory>>();
 
   /** Group history interface to be passed to group instaces */
-  private groupHistory: MarmotGroupOptions<THistory>["history"];
+  private historyFactory: GroupHistoryFactory<THistory>;
 
   constructor(options: MarmotClientOptions<THistory>) {
     this.signer = options.signer;
@@ -85,7 +85,11 @@ export class MarmotClient<
     this.keyPackageStore = options.keyPackageStore;
     this.network = options.network;
     this.cryptoProvider = options.cryptoProvider ?? defaultCryptoProvider;
-    this.groupHistory = options.groupHistory;
+
+    // Set the history factory if its set in the options
+    this.historyFactory = (
+      "historyFactory" in options ? options.historyFactory : undefined
+    ) as GroupHistoryFactory<THistory>;
   }
 
   /** Get a ciphersuite implementation from a name or id */
@@ -110,7 +114,7 @@ export class MarmotClient<
         signer: this.signer,
         cryptoProvider: this.cryptoProvider,
         network: this.network,
-        history: this.groupHistory,
+        history: this.historyFactory,
       });
 
       // Save group to cache
@@ -133,7 +137,7 @@ export class MarmotClient<
       store: this.groupStore,
       signer: this.signer,
       network: this.network,
-      history: this.groupHistory,
+      history: this.historyFactory,
     });
 
     // Save group to store
@@ -179,7 +183,7 @@ export class MarmotClient<
       store: this.groupStore,
       signer: this.signer,
       network: this.network,
-      history: this.groupHistory,
+      history: this.historyFactory,
     });
 
     // Save the group to the cache
@@ -326,7 +330,7 @@ export class MarmotClient<
       store: this.groupStore,
       signer: this.signer,
       network: this.network,
-      history: this.groupHistory,
+      history: this.historyFactory,
     });
 
     // Add the group to the cache

@@ -6,6 +6,7 @@ describe("exports", () => {
     expect(Object.keys(exports).sort()).toMatchInlineSnapshot(`
       [
         "GROUP_EVENT_KIND",
+        "GroupRumorHistory",
         "GroupStore",
         "KEY_PACKAGE_CIPHER_SUITE_TAG",
         "KEY_PACKAGE_CLIENT_TAG",
@@ -21,7 +22,6 @@ describe("exports", () => {
         "MARMOT_GROUP_DATA_VERSION",
         "MarmotClient",
         "MarmotGroup",
-        "MarmotGroupHistoryStore",
         "Proposals",
         "WELCOME_EVENT_KIND",
         "calculateKeyPackageRef",

@@ -8,7 +8,6 @@ import {
   getGroupMembers,
   getNostrGroupIdHex,
   MarmotGroup,
-  GroupRumorHistory,
   unixNow,
 } from "marmot-ts";
 import { getEventHash } from "nostr-tools";

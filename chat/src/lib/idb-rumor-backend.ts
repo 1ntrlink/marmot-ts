@@ -6,7 +6,7 @@ import {
   NostrEvent,
 } from "applesauce-core/helpers";
 import { type DBSchema, type IDBPDatabase, openDB } from "idb";
-import { GroupRumorHistoryBackend } from "marmot-ts/store";
+import { GroupRumorHistoryBackend } from "marmot-ts/client";
 
 const DB_VERSION = 1;
 const STORE_NAME = "rumors";
@@ -31,7 +31,7 @@ interface GroupHistoryDB extends DBSchema {
  * IndexedDB-backed implementation of {@link MarmotGroupHistoryStoreBackend}.
  * Stores and retrieves group history (MIP-03 rumors) using the `idb` package.
  */
-export class IdbRumorStore implements GroupRumorHistoryBackend {
+export class IdbRumorBackend implements GroupRumorHistoryBackend {
   private name: string;
   private groupKey: string;
 

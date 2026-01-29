@@ -46,16 +46,18 @@ import {
 import { NostrNetworkInterface, PublishResponse } from "../nostr-interface.js";
 import { proposeInviteUser } from "./proposals/invite-user.js";
 
-/** The minimum interface for a group to store its message history */
+/**
+ * The minimum interface for a group to store them MLS messages
+ * Implementations should extend this with methods for querying and loading stored messages
+ */
 export interface BaseGroupHistory {
   /** Saves a new application message to the group history */
   saveMessage(groupId: Uint8Array, message: Uint8Array): Promise<void>;
 }
 
 /** A factory function that creates a {@link BaseGroupHistory} instance for a group id */
-export type GroupHistoryFactory<
-  THistory extends BaseGroupHistory | undefined = undefined,
-> = (groupId: Uint8Array) => THistory;
+export type GroupHistoryFactory<THistory extends BaseGroupHistory | undefined> =
+  (groupId: Uint8Array) => THistory;
 
 export type ProposalContext = {
   state: ClientState;
@@ -74,20 +76,19 @@ export type ProposalBuilder<
   T extends Proposal | Proposal[],
 > = (...args: Args) => ProposalAction<T>;
 
-export type MarmotGroupOptions<
-  THistory extends BaseGroupHistory | undefined = undefined,
-> = {
-  /** The backend to store and load of group from */
-  store: GroupStore;
-  /** The signer used for the clients identity */
-  signer: EventSigner;
-  /** The ciphersuite implementation to use for the group */
-  ciphersuite: CiphersuiteImpl;
-  /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
-  network: NostrNetworkInterface;
-  /** The storage interface for the groups application message history */
-  history: THistory | GroupHistoryFactory<THistory>;
-};
+export type MarmotGroupOptions<THistory extends BaseGroupHistory | undefined> =
+  {
+    /** The backend to store and load of group from */
+    store: GroupStore;
+    /** The signer used for the clients identity */
+    signer: EventSigner;
+    /** The ciphersuite implementation to use for the group */
+    ciphersuite: CiphersuiteImpl;
+    /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
+    network: NostrNetworkInterface;
+    /** The storage interface for the groups application message history */
+    history: THistory | GroupHistoryFactory<THistory>;
+  };
 
 /** Information about a welcome recipient */
 export type WelcomeRecipient = {
@@ -143,9 +144,7 @@ export function createAdminCommitPolicyCallback(args: {
  * The main class for interacting with a MLS group
  * @template THistory - The type of the history store to use for the group, must implement the {@link BaseGroupHistory} interface. (Default is no history store)
  */
-export class MarmotGroup<
-  THistory extends BaseGroupHistory | undefined = undefined,
-> {
+export class MarmotGroup<THistory extends BaseGroupHistory | undefined = any> {
   /** The backend to store and load of group from */
   readonly store: GroupStore;
 
@@ -217,7 +216,7 @@ export class MarmotGroup<
   }
 
   /** Loads a group from the store */
-  static async load<THistory extends BaseGroupHistory | undefined = undefined>(
+  static async load<THistory extends BaseGroupHistory | undefined = any>(
     groupId: Uint8Array | string,
     options: Omit<MarmotGroupOptions<THistory>, "ciphersuite"> & {
       cryptoProvider?: CryptoProvider;
