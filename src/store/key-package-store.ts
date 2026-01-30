@@ -3,6 +3,7 @@ import { CryptoProvider, defaultCryptoProvider } from "ts-mls";
 import { KeyPackage, PrivateKeyPackage } from "ts-mls/keyPackage.js";
 import { calculateKeyPackageRef } from "../core/key-package.js";
 import { KeyValueStoreBackend } from "../utils/key-value.js";
+import { EventEmitter } from "eventemitter3";
 
 export type StoredKeyPackage = {
   /** The calculated key package reference (should be used to identify the key package) */
@@ -21,11 +22,15 @@ export interface KeyPackageStoreBackend extends KeyValueStoreBackend<StoredKeyPa
 
 /** Options for creating a {@link KeyPackageStore} instance */
 export type KeyPackageStoreOptions = {
-  prefix?: string;
   /** The crypto provider to use for cryptographic operations */
   cryptoProvider?: CryptoProvider;
-  /** Optional callback invoked when a key package is added/updated */
-  onUpdate?: (key?: string) => void;
+};
+
+type KeyPackageStoreEvents = {
+  /** Emitted when a key package is added */
+  keyPackageAdded: (keyPackage: StoredKeyPackage) => any;
+  /** Emitted when a key package is removed */
+  keyPackageRemoved: (keyPackageRef: Uint8Array) => any;
 };
 
 /**
@@ -49,26 +54,22 @@ export type KeyPackageStoreOptions = {
  * await store.remove(publicPackage);
  * ```
  */
-export class KeyPackageStore {
+export class KeyPackageStore extends EventEmitter<KeyPackageStoreEvents> {
   private backend: KeyPackageStoreBackend;
   private readonly cryptoProvider: CryptoProvider;
-  private readonly prefix?: string;
-  private readonly onUpdate?: (key?: string) => void;
 
   /**
    * Creates a new KeyPackageStore instance.
    * @param backend - The storage backend to use (e.g., localForage)
-   * @param hash - The hash implementation to use (defaults to SHA-256)
-   * @param prefix - Optional prefix to add to all storage keys (useful for namespacing)
+   * @param options - Options for the store
    */
   constructor(
     backend: KeyPackageStoreBackend,
-    { prefix, onUpdate, cryptoProvider }: KeyPackageStoreOptions = {},
+    { cryptoProvider }: KeyPackageStoreOptions = {},
   ) {
+    super();
     this.backend = backend;
     this.cryptoProvider = cryptoProvider ?? defaultCryptoProvider;
-    this.prefix = prefix;
-    this.onUpdate = onUpdate;
   }
 
   /**
@@ -78,21 +79,18 @@ export class KeyPackageStore {
   private async resolveStorageKey(
     hashOrPackage: Uint8Array | string | KeyPackage,
   ): Promise<string> {
-    let key: string;
     if (typeof hashOrPackage === "string") {
-      // Already a hex string, add prefix
-      key = hashOrPackage;
-    } else if (hashOrPackage instanceof Uint8Array) {
-      // Convert Uint8Array to hex and add prefix
-      key = bytesToHex(hashOrPackage);
-    } else {
-      // Calculate the key package reference from the public package
-      key = bytesToHex(
-        await calculateKeyPackageRef(hashOrPackage, this.cryptoProvider),
-      );
+      // Already a hex string
+      return hashOrPackage;
     }
-
-    return (this.prefix ?? "") + key;
+    if (hashOrPackage instanceof Uint8Array) {
+      // Convert Uint8Array to hex
+      return bytesToHex(hashOrPackage);
+    }
+    // Calculate the key package reference from the public package
+    return bytesToHex(
+      await calculateKeyPackageRef(hashOrPackage, this.cryptoProvider),
+    );
   }
 
   /** Ensures that a stored key package object has a key package reference */
@@ -145,8 +143,8 @@ export class KeyPackageStore {
 
     await this.backend.setItem(key, serialized);
 
-    // Notify about the change if callback provided
-    this.onUpdate?.(key);
+    const stored = await this.ensureKeyPackageRef(serialized);
+    this.emit("keyPackageAdded", stored);
 
     return key;
   }
@@ -204,10 +202,13 @@ export class KeyPackageStore {
    */
   async remove(ref: Uint8Array | string | KeyPackage): Promise<void> {
     const key = await this.resolveStorageKey(ref);
+    const stored = await this.backend.getItem(key);
     await this.backend.removeItem(key);
 
-    // Notify about the change if callback provided
-    this.onUpdate?.(key);
+    if (stored) {
+      const withRef = await this.ensureKeyPackageRef(stored);
+      this.emit("keyPackageRemoved", withRef.keyPackageRef);
+    }
   }
 
   /**
@@ -217,13 +218,8 @@ export class KeyPackageStore {
   async list(): Promise<ListedKeyPackage[]> {
     const allKeys = await this.backend.keys();
 
-    // Filter keys by prefix
-    const keys = this.prefix
-      ? allKeys.filter((key) => key.startsWith(this.prefix!))
-      : allKeys;
-
     const packages = await Promise.all(
-      keys.map((key) =>
+      allKeys.map((key) =>
         this.backend
           .getItem(key)
           .then((pkg) => pkg && this.ensureKeyPackageRef(pkg)),
@@ -246,25 +242,16 @@ export class KeyPackageStore {
     return packages.length;
   }
 
-  /** Clears all key packages from the store (only those matching the prefix if one is set). */
+  /** Clears all key packages from the store. */
   async clear(): Promise<void> {
-    if (this.prefix) {
-      // Only clear keys with this prefix
-      const allKeys = await this.backend.keys();
-      const keysToRemove = allKeys.filter((key) =>
-        key.startsWith(this.prefix!),
-      );
-      await Promise.all(
-        keysToRemove.map((key) => this.backend.removeItem(key)),
-      );
-    } else {
-      // Clear all keys
-      await this.backend.clear();
-    }
-
-    // Notify about the change if callback provided
-    if (this.onUpdate) {
-      this.onUpdate();
+    const allKeys = await this.backend.keys();
+    for (const key of allKeys) {
+      const stored = await this.backend.getItem(key);
+      await this.backend.removeItem(key);
+      if (stored) {
+        const withRef = await this.ensureKeyPackageRef(stored);
+        this.emit("keyPackageRemoved", withRef.keyPackageRef);
+      }
     }
   }
 
