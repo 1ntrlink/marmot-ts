@@ -95,12 +95,14 @@ export const liveKeyPackages$ = marmotClient$.pipe(
     return new Observable<Awaited<ReturnType<KeyPackageStore["list"]>>>(
       (subscriber) => {
         const abortController = new AbortController();
+        const iterator = client.watchKeyPackages()[Symbol.asyncIterator]();
 
         (async () => {
           try {
-            for await (const keyPackages of client.watchKeyPackages()) {
-              if (abortController.signal.aborted) break;
-              subscriber.next(keyPackages);
+            while (!abortController.signal.aborted) {
+              const { value, done } = await iterator.next();
+              if (done) break;
+              subscriber.next(value);
             }
           } catch (error) {
             subscriber.error(error);
@@ -111,6 +113,7 @@ export const liveKeyPackages$ = marmotClient$.pipe(
 
         return () => {
           abortController.abort();
+          iterator.return?.(undefined);
         };
       },
     );
@@ -129,12 +132,14 @@ export const liveGroups$ = marmotClient$.pipe(
     // Use the new watchGroups async generator from MarmotClient
     return new Observable<MarmotGroup<GroupRumorHistory>[]>((subscriber) => {
       const abortController = new AbortController();
+      const iterator = client.watchGroups()[Symbol.asyncIterator]();
 
       (async () => {
         try {
-          for await (const groups of client.watchGroups()) {
-            if (abortController.signal.aborted) break;
-            subscriber.next(groups);
+          while (!abortController.signal.aborted) {
+            const { value, done } = await iterator.next();
+            if (done) break;
+            subscriber.next(value);
           }
         } catch (error) {
           subscriber.error(error);
@@ -145,6 +150,7 @@ export const liveGroups$ = marmotClient$.pipe(
 
       return () => {
         abortController.abort();
+        iterator.return?.(undefined);
       };
     });
   }),

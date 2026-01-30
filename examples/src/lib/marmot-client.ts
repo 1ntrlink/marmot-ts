@@ -14,7 +14,6 @@ import {
 } from "rxjs";
 import localforage from "localforage";
 import {
-  GroupStateStore,
   KeyValueGroupStateBackend,
   MarmotClient,
   defaultMarmotClientConfig,
@@ -74,17 +73,16 @@ export const marmotClient$ = combineLatest([
   keyPackageStore$,
 ]).pipe(
   map(([account, keyPackageStore]) => {
-    // Create a GroupStateStore with a KeyValueGroupStateBackend wrapping localforage
+    // Create a KeyValueGroupStateBackend wrapping localforage
     const groupStateBackend = new KeyValueGroupStateBackend(
       localforage.createInstance({
         name: "marmot-group-store",
       }),
     );
-    const groupStateStore = new GroupStateStore(groupStateBackend);
 
     return new MarmotClient({
       signer: account.signer,
-      groupStateBackend: groupStateStore,
+      groupStateBackend,
       keyPackageStore,
       network: networkInterface,
       clientConfig: defaultMarmotClientConfig,
