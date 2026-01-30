@@ -17,14 +17,11 @@ const storeChanges$ = new BehaviorSubject<number>(0);
 
 // Create and export a shared KeyPackageStore instance
 export const keyPackageStore$ = accounts.active$.pipe(
-  map((account) => {
+  map(() => {
     return new KeyPackageStore(
       localforage.createInstance({
         name: "marmot-key-package-store",
       }),
-      {
-        prefix: account?.pubkey ?? "anon",
-      },
     );
   }),
   switchMap((store) => {
