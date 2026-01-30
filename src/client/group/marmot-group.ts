@@ -1,5 +1,6 @@
 import type { Rumor } from "applesauce-common/helpers/gift-wrap";
 import type { EventSigner } from "applesauce-core/event-factory";
+import { hexToBytes } from "@noble/hashes/utils.js";
 import { bytesToHex, type NostrEvent } from "applesauce-core/helpers/event";
 import { EventEmitter } from "eventemitter3";
 import {
@@ -37,7 +38,7 @@ import { getKeyPackage } from "../../core/key-package-event.js";
 import { isPrivateMessage } from "../../core/message.js";
 import { MarmotGroupData } from "../../core/protocol.js";
 import { createWelcomeRumor } from "../../core/welcome.js";
-import { GroupStore } from "../../store/group-store.js";
+import { GroupStateStore } from "../../store/group-state-store.js";
 import { createGiftWrap, hasAck } from "../../utils/index.js";
 import {
   NoGroupRelaysError,
@@ -81,16 +82,16 @@ export type ProposalBuilder<
 
 export type MarmotGroupOptions<THistory extends BaseGroupHistory | undefined> =
   {
-    /** The backend to store and load of group from */
-    store: GroupStore;
+    /** The state store to store and load group state from */
+    stateStore: GroupStateStore;
     /** The signer used for the clients identity */
     signer: EventSigner;
     /** The ciphersuite implementation to use for the group */
     ciphersuite: CiphersuiteImpl;
     /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
     network: NostrNetworkInterface;
-    /** The storage interface for the groups application message history */
-    history: THistory | GroupHistoryFactory<THistory>;
+    /** The storage interface for the groups application message history (optional) */
+    history?: THistory | GroupHistoryFactory<THistory>;
   };
 
 /** Information about a welcome recipient */
@@ -164,8 +165,8 @@ type MarmotGroupEvents<THistory extends BaseGroupHistory | undefined = any> = {
 export class MarmotGroup<
   THistory extends BaseGroupHistory | undefined = any,
 > extends EventEmitter<MarmotGroupEvents<THistory>> {
-  /** The backend to store and load of group from */
-  readonly store: GroupStore;
+  /** The state store to store and load group state from */
+  readonly stateStore: GroupStateStore;
 
   /** The signer used for the clients identity */
   readonly signer: EventSigner;
@@ -177,7 +178,7 @@ export class MarmotGroup<
   readonly network: NostrNetworkInterface;
 
   /** The storage interface for the groups application message history */
-  readonly history: THistory;
+  readonly history: THistory | undefined;
 
   /** Whether group state has been modified */
   dirty = false;
@@ -228,15 +229,21 @@ export class MarmotGroup<
   constructor(state: ClientState, options: MarmotGroupOptions<THistory>) {
     super();
     this.#state = state;
-    this.store = options.store;
+    this.stateStore = options.stateStore;
     this.signer = options.signer;
     this.ciphersuite = options.ciphersuite;
     this.network = options.network;
 
-    // Create the history store
-    if (typeof options.history === "function") {
-      this.history = options.history(this.id);
-    } else this.history = options.history;
+    // Create the history store (optional)
+    if (options.history) {
+      if (typeof options.history === "function") {
+        this.history = options.history(this.id);
+      } else {
+        this.history = options.history;
+      }
+    } else {
+      this.history = undefined;
+    }
 
     // Set useful fields
     this.idStr = bytesToHex(this.id);
@@ -249,16 +256,15 @@ export class MarmotGroup<
       cryptoProvider?: CryptoProvider;
     },
   ): Promise<MarmotGroup<THistory>> {
-    const state = await options.store.get(groupId);
-    if (!state) throw new Error(`Group ${groupId} not found`);
+    const id = typeof groupId === "string" ? hexToBytes(groupId) : groupId;
+    const stateBytes = await options.stateStore.get(id);
+    if (!stateBytes) throw new Error(`Group ${groupId} not found`);
 
-    // Get the group's ciphersuite implementation
-    const cipherSuite = await getCiphersuiteImpl(
-      getCiphersuiteFromName(state.groupContext.cipherSuite),
-      options.cryptoProvider,
+    // Note: The caller (MarmotClient) is responsible for hydrating the state
+    // This method is primarily used internally by MarmotClient which handles hydration
+    throw new Error(
+      "MarmotGroup.load() is deprecated. Use MarmotClient.getGroup() instead.",
     );
-
-    return new MarmotGroup(state, { ...options, ciphersuite: cipherSuite });
   }
 
   /** Creates a new {@link MarmotGroup} instance from a {@link ClientState} object */
@@ -283,7 +289,10 @@ export class MarmotGroup<
   async save() {
     if (!this.dirty) return;
 
-    await this.store.update(this.state);
+    // Import serializeClientState dynamically to avoid circular dependencies
+    const { serializeClientState } = await import("../../core/client-state.js");
+    const stateBytes = serializeClientState(this.state);
+    await this.stateStore.set(this.id, stateBytes);
     this.dirty = false;
     this.emit("stateSaved", this);
   }
@@ -913,7 +922,7 @@ export class MarmotGroup<
     if (this.history) await this.history.purgeMessages();
 
     // Remove the group from the store
-    await this.store.remove(this.id);
+    await this.stateStore.remove(this.id);
 
     // Emit the destroyed event
     this.emit("destroyed", this);
