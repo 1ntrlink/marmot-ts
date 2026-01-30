@@ -90,6 +90,7 @@ export class GroupRumorHistory
 
     while (true) {
       const rumors = await this.backend.queryRumors({
+        ...filter,
         until: cursor,
         limit,
       });

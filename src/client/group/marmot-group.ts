@@ -153,6 +153,8 @@ type MarmotGroupEvents<THistory extends BaseGroupHistory | undefined = any> = {
   stateSaved: (group: MarmotGroup<THistory>) => any;
   /** Emitted when the group is destroyed */
   destroyed: (group: MarmotGroup<THistory>) => any;
+  /** Emitted when history persistence fails (best-effort, non-blocking) */
+  historyError: (error: Error) => any;
 };
 
 /**
@@ -796,9 +798,13 @@ export class MarmotGroup<
           // Application messages also update state (for forward secrecy)
           this.state = result.newState;
 
-          // Save application message to history
+          // Save application message to history (best-effort)
           if (this.history) {
-            await this.history.saveMessage(result.message);
+            try {
+              await this.history.saveMessage(result.message);
+            } catch (err) {
+              this.emit("historyError", err as Error);
+            }
           }
 
           yield result;
