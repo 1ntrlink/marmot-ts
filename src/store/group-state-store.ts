@@ -10,7 +10,7 @@ export interface GroupStateStoreBackend {
   /** Remove state bytes from the store by group ID */
   remove(groupId: Uint8Array): Promise<void>;
   /** List all group IDs in the store */
-  list(): Promise<Uint8Array[]>;
+  list(): Promise<SerializedClientState[]>;
 }
 
 /** Events emitted by the GroupStateStore */
