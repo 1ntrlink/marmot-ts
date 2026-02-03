@@ -93,7 +93,7 @@ export function AppSidebar({
       {/* Hidden on mobile since we use Sheet for mobile nav */}
       <Sidebar
         collapsible="none"
-        className="hidden md:flex w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
+        className="w-[calc(var(--sidebar-width-icon)+1px)]! border-r"
       >
         <SidebarHeader>
           <SidebarMenu>
@@ -187,11 +187,11 @@ export function AppSidebar({
         </SidebarFooter>
       </Sidebar>
 
-      {/* This is the second sidebar - Content area */}
-      {/* On mobile, this takes full width */}
+      {/* This is the second sidebar */}
+      {/* We disable collapsible and let it fill remaining space */}
       <Sidebar
         collapsible="none"
-        className="flex flex-1 overflow-hidden w-full min-w-0 md:min-w-[16rem] border-0 md:border-l"
+        className="hidden flex-1 md:flex overflow-hidden"
       >
         <SidebarHeader className="gap-3.5 border-b p-4">
           <div className="flex w-full items-center justify-between gap-2">

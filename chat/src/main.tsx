@@ -79,8 +79,7 @@ createRoot(document.getElementById("root")!).render(
       <SidebarProvider
         style={
           {
-            "--sidebar-width": "16rem",
-            "--sidebar-width-mobile": "18rem",
+            "--sidebar-width": "400px",
           } as React.CSSProperties
         }
       >
