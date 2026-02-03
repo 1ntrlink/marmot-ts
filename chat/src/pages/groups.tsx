@@ -1,7 +1,7 @@
-import { Link, Outlet, useLocation, useNavigate } from "react-router";
-
 import { use$ } from "applesauce-react/hooks";
+import { TrashIcon } from "lucide-react";
 import { GroupRumorHistory, MarmotGroup } from "marmot-ts";
+import { Link, Outlet, useLocation, useNavigate } from "react-router";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -65,12 +65,12 @@ function GroupItem({
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button
-            variant="ghost"
-            size="icon-sm"
+            size="icon"
             className="mr-2"
             onClick={(e) => e.stopPropagation()}
+            variant="destructive"
           >
-            Remove
+            <TrashIcon />
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>

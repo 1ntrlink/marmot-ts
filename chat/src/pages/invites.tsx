@@ -1,20 +1,30 @@
+import { bytesToHex, relaySet } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
-import { bytesToHex } from "applesauce-core/helpers";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
+import { combineLatest, map, shareReplay } from "rxjs";
 
 import { AppSidebar } from "@/components/app-sidebar";
-import { PageHeader } from "@/components/page-header";
 import { PageBody } from "@/components/page-body";
+import { PageHeader } from "@/components/page-header";
+import { SubscriptionStatusButton } from "@/components/subscription-status-button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset } from "@/components/ui/sidebar";
-import { withSignIn } from "@/components/with-signIn";
-import { getInvitationInboxManager } from "@/lib/runtime";
-import { marmotClient$ } from "@/lib/marmot-client";
+import { withActiveAccount } from "@/components/with-active-account";
+import { user$ } from "@/lib/accounts";
 import type { PendingInvite } from "@/lib/invitation-inbox-manager";
+import { marmotClient$ } from "@/lib/marmot-client";
+import { getInvitationInboxManager } from "@/lib/runtime";
+import { extraRelays$ } from "@/lib/settings";
+
+/** An observable of all relays to read invites from (user inboxes + extra relays) */
+const readRelays$ = combineLatest([user$.inboxes$, extraRelays$]).pipe(
+  map((all) => relaySet(...all)),
+  shareReplay(1),
+);
 
 function InviteRow({
   invite,
@@ -97,7 +107,10 @@ function InvitesPage() {
 
   return (
     <>
-      <AppSidebar title="Invites">
+      <AppSidebar
+        title="Invites"
+        actions={<SubscriptionStatusButton relays={readRelays$} />}
+      >
         <div className="flex flex-col">
           <div className="p-2">
             <div className="text-xs text-muted-foreground">
@@ -138,7 +151,6 @@ function InvitesPage() {
           )}
         </div>
       </AppSidebar>
-
       <SidebarInset>
         <PageHeader
           items={[{ label: "Home", to: "/" }, { label: "Invites" }]}
@@ -257,4 +269,4 @@ function InvitesPage() {
   );
 }
 
-export default withSignIn(InvitesPage);
+export default withActiveAccount(InvitesPage);

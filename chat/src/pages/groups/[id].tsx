@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router";
 import { from, of, switchMap } from "rxjs";
 import { catchError, map } from "rxjs/operators";
 
+import { UserBadge } from "@/components/nostr-user";
 import { PageHeader } from "@/components/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -45,14 +46,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { withSignIn } from "@/components/with-signIn";
-import { UserBadge } from "@/components/nostr-user";
 import { useGroupMessages } from "@/hooks/use-group-messages";
 import accountManager, { accounts, user$ } from "@/lib/accounts";
 import { marmotClient$ } from "@/lib/marmot-client";
 import { pool } from "@/lib/nostr";
 import { getGroupSubscriptionManager } from "@/lib/runtime";
 import { extraRelays$ } from "@/lib/settings";
+import { withActiveAccount } from "../../components/with-active-account";
 
 function jsonStringifySafe(value: unknown): string {
   return JSON.stringify(
@@ -684,4 +684,4 @@ function GroupDetailPage() {
   );
 }
 
-export default withSignIn(GroupDetailPage);
+export default withActiveAccount(GroupDetailPage);

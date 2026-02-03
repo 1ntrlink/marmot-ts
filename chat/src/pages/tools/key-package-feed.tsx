@@ -8,8 +8,8 @@ import {
   getKeyPackageClient,
 } from "marmot-ts";
 import { useMemo, useState } from "react";
-import { of } from "rxjs";
-import { map } from "rxjs/operators";
+import { EMPTY, of } from "rxjs";
+import { catchError, map } from "rxjs/operators";
 
 import CipherSuiteBadge from "@/components/cipher-suite-badge";
 import KeyPackageDetailsModal from "@/components/key-package/details-modal";
@@ -18,11 +18,41 @@ import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { pool } from "@/lib/nostr";
 import { relayConfig$ } from "@/lib/settings";
 import { formatTimeAgo } from "@/lib/time";
+import { NewRelayForm } from "../settings/relays";
+
+function RelayCard({ url }: { url: string }) {
+  // Extract relay name from URL for display
+  const inst = useMemo(() => pool.relay(url), [url]);
+  const info = use$(inst.information$);
+  const icon = use$(inst.icon$);
+  const name = info?.name || new URL(url).hostname;
+
+  return (
+    <Card>
+      <CardContent>
+        <div className="flex items-start gap-3">
+          <div className="mt-1">
+            <img src={icon} className="w-4 h-4" alt="" />
+          </div>
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="font-semibold text-lg">{name}</div>
+            <div className="text-sm text-muted-foreground">
+              Nostr relay for key package discovery
+            </div>
+            <div className="flex items-center gap-2">
+              <code className="text-xs text-muted-foreground break-all font-mono bg-muted px-2 py-1 rounded">
+                {url || "No relay configured"}
+              </code>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 function KeyPackageItem({ event }: { event: NostrEvent }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -103,6 +133,7 @@ export default function KeyPackageFeedPage() {
         onlyEvents(),
         mapEventsToTimeline(),
         map((arr) => [...arr]),
+        catchError(() => EMPTY),
       );
   }, [selectedRelay]);
 
@@ -129,31 +160,9 @@ export default function KeyPackageFeedPage() {
       />
       <PageBody>
         <div className="space-y-6">
-          {/* Header */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold">Key Package Feed</h1>
-            <p className="text-muted-foreground">
-              Browse recent key packages published to a Nostr relay (kind 443
-              events)
-            </p>
-          </div>
+          {selectedRelay && <RelayCard url={selectedRelay} />}
 
-          {/* Relay Selector */}
-          <div className="space-y-2">
-            <Label htmlFor="relay-input">Relay URL</Label>
-            <Input
-              id="relay-input"
-              type="text"
-              placeholder="wss://relay.example.com"
-              value={selectedRelay}
-              onChange={(e) => setSelectedRelay(e.target.value)}
-              className="font-mono"
-            />
-            <p className="text-xs text-muted-foreground">
-              Enter a relay URL to fetch key packages from. Extra relays will
-              also be queried.
-            </p>
-          </div>
+          <NewRelayForm onAdd={setSelectedRelay} />
 
           {/* Event Count */}
           <div className="flex justify-between items-center">

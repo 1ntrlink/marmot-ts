@@ -1,6 +1,5 @@
 import { bytesToHex, relaySet, type NostrEvent } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
-import { Plus } from "lucide-react";
 import { getKeyPackageClient, ListedKeyPackage } from "marmot-ts";
 import { useMemo } from "react";
 import { Link, Outlet, useLocation } from "react-router";
@@ -12,7 +11,7 @@ import { SubscriptionStatusButton } from "@/components/subscription-status-butto
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SidebarInset } from "@/components/ui/sidebar";
-import { withSignIn } from "@/components/with-signIn";
+import { withActiveAccount } from "@/components/with-active-account";
 import { user$ } from "@/lib/accounts";
 import { keyPackageRelays$, publishedKeyPackages$ } from "@/lib/lifecycle";
 import { liveKeyPackages$ } from "@/lib/marmot-client";
@@ -127,19 +126,12 @@ function KeyPackagesPage() {
     <>
       <AppSidebar
         title="Key Packages"
-        actions={
-          <div className="flex items-center gap-2">
-            <SubscriptionStatusButton relays={readRelays$} />
-            <Button asChild size="sm" variant="default">
-              <Link to="/key-packages/create">
-                <Plus className="h-4 w-4 mr-1" />
-                New
-              </Link>
-            </Button>
-          </div>
-        }
+        actions={<SubscriptionStatusButton relays={readRelays$} />}
       >
         <div className="flex flex-col">
+          <Button asChild variant="default" className="m-2">
+            <Link to="/key-packages/create">Create Key Package</Link>
+          </Button>
           {displayItems.items.length > 0 ? (
             displayItems.items.map((item) => (
               <KeyPackageItem
@@ -166,4 +158,4 @@ function KeyPackagesPage() {
   );
 }
 
-export default withSignIn(KeyPackagesPage);
+export default withActiveAccount(KeyPackagesPage);

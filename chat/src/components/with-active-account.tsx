@@ -3,10 +3,10 @@ import type { ComponentType } from "react";
 import { Navigate, useLocation } from "react-router";
 import accountManager from "../lib/accounts";
 
-export function withSignIn<P extends object>(
+export function withActiveAccount<P extends object>(
   Component: ComponentType<P>,
 ): ComponentType<P> {
-  return function WithSignInWrapper(props: P) {
+  return function WithActiveAccountWrapper(props: P) {
     const location = useLocation();
     const active = use$(accountManager.active$);
 
@@ -14,6 +14,7 @@ export function withSignIn<P extends object>(
       return (
         <Navigate
           to={{ pathname: "/signin", search: `?to=${location.pathname}` }}
+          replace
         />
       );
 

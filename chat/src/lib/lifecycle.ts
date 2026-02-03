@@ -58,6 +58,7 @@ export type PublishedKeyPackage = {
   keyPackageRef: Uint8Array;
 };
 
+/** An observable of all published key packages for the current user */
 export const publishedKeyPackages$ = combineLatest([
   user$,
   marmotClient$,

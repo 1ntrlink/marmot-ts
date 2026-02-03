@@ -84,12 +84,8 @@ export async function publish(event: NostrEvent, relays?: string[]) {
   // Optimiztially add event to the store
   eventStore.add(event);
 
-  await Promise.allSettled([
-    // Save event to the local cache
-    window.nostrdb.add(event),
-    // Publish event to all relays
-    pool.publish(relays, event),
-  ]);
+  // Publish event to all relays
+  await pool.publish(relays, event);
 }
 
 // Create an event factory for the current active account

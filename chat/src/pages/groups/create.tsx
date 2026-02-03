@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { withSignIn } from "@/components/with-signIn";
+import { withActiveAccount } from "@/components/with-active-account";
 import accountManager from "@/lib/accounts";
 import { marmotClient$ } from "@/lib/marmot-client";
 import { extraRelays$ } from "@/lib/settings";
@@ -378,4 +378,4 @@ function CreateGroupPage() {
   );
 }
 
-export default withSignIn(CreateGroupPage);
+export default withActiveAccount(CreateGroupPage);

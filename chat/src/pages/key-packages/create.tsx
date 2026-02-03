@@ -1,13 +1,13 @@
 import { relaySet } from "applesauce-core/helpers";
 import { use$ } from "applesauce-react/hooks";
-import { Loader2, XCircle } from "lucide-react";
+import { AlertCircle, Loader2, XCircle } from "lucide-react";
 import {
   createCredential,
   createKeyPackageEvent,
   generateKeyPackage,
 } from "marmot-ts";
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   defaultCryptoProvider,
   getCiphersuiteFromName,
@@ -16,10 +16,9 @@ import {
 import { type CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
 
 import { CipherSuitePicker } from "@/components/form/cipher-suite-picker";
-import { KeyPackageRelaysAlert } from "@/components/key-package-relays-alert";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -29,11 +28,34 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { withSignIn } from "@/components/with-signIn";
+import { withActiveAccount } from "@/components/with-active-account";
 import { accounts, user$ } from "@/lib/accounts";
 import { keyPackageRelays$ } from "@/lib/lifecycle";
 import { marmotClient$ } from "@/lib/marmot-client";
 import { eventStore, pool } from "@/lib/nostr";
+
+/**
+ * Reusable alert component that directs users to set up their key package relays
+ * when they haven't configured them yet.
+ */
+export function KeyPackageRelaysAlert() {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle className="h-4 w-4" />
+      <AlertTitle>Key Package Relays Not Configured</AlertTitle>
+      <AlertDescription className="mt-2">
+        <p className="mb-3">
+          You need to configure your key package relays before creating a key
+          package. This tells other users which relays to check for your key
+          packages.
+        </p>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/settings/marmot">Configure Key Package Relays</Link>
+        </Button>
+      </AlertDescription>
+    </Alert>
+  );
+}
 
 function CreateKeyPackagePage() {
   // Subscribe to the user's key package relays and mailboxes
@@ -198,4 +220,4 @@ function CreateKeyPackagePage() {
   );
 }
 
-export default withSignIn(CreateKeyPackagePage);
+export default withActiveAccount(CreateKeyPackagePage);

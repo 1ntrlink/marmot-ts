@@ -1,12 +1,3 @@
-import { AppSidebar } from "@/components/app-sidebar";
-import { UserAvatar, UserName } from "@/components/nostr-user";
-import { SidebarInput, SidebarInset } from "@/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { user$ } from "@/lib/accounts";
 import { IconLock } from "@tabler/icons-react";
 import { castUser, User } from "applesauce-common/casts/user";
 import { normalizeToProfilePointer } from "applesauce-core/helpers";
@@ -16,12 +7,22 @@ import { KEY_PACKAGE_RELAY_LIST_KIND } from "marmot-ts";
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 import { BehaviorSubject } from "rxjs";
-import { Label } from "../components/ui/label";
-import { Switch } from "../components/ui/switch";
-import { useDebounce } from "../hooks/use-debounce";
-import { eventLoader, eventStore } from "../lib/nostr";
-import { profileSearch } from "../lib/search";
-import { persist } from "../lib/settings";
+
+import { AppSidebar } from "@/components/app-sidebar";
+import { UserAvatar, UserName } from "@/components/nostr-user";
+import { Label } from "@/components/ui/label";
+import { SidebarInput, SidebarInset } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useDebounce } from "@/hooks/use-debounce";
+import { user$ } from "@/lib/accounts";
+import { eventLoader, eventStore } from "@/lib/nostr";
+import { profileSearch } from "@/lib/search";
+import { persist } from "@/lib/settings";
 
 const hasKeyPackageRelays$ = new BehaviorSubject<boolean>(false);
 persist("contacts:has-key-package-relays", hasKeyPackageRelays$);

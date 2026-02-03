@@ -9,7 +9,7 @@ import { Link } from "react-router";
 import { UserAvatar, UserName } from "@/components/nostr-user";
 import { PageBody } from "@/components/page-body";
 import { PageHeader } from "@/components/page-header";
-import { withSignIn } from "@/components/with-signIn";
+import { withActiveAccount } from "@/components/with-active-account";
 import accounts, { user$ } from "@/lib/accounts";
 import { eventStore, pool } from "@/lib/nostr";
 import { extraRelays$ } from "@/lib/settings";
@@ -97,4 +97,4 @@ function ContactsIndexPage() {
   );
 }
 
-export default withSignIn(ContactsIndexPage);
+export default withActiveAccount(ContactsIndexPage);

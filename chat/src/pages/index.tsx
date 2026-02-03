@@ -1,6 +1,5 @@
 import { AppSidebar } from "@/components/app-sidebar";
 import { PageHeader } from "@/components/page-header";
-import { SidebarInset } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,14 +8,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { SidebarInset } from "@/components/ui/sidebar";
 import {
-  MessageSquareIcon,
-  Settings,
-  Server,
-  KeyIcon,
-  InboxIcon,
-  UsersIcon,
   ArrowRight,
+  InboxIcon,
+  KeyIcon,
+  MessageSquareIcon,
+  Server,
+  Settings,
+  UsersIcon,
 } from "lucide-react";
 import { Link } from "react-router";
 
