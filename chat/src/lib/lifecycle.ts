@@ -15,7 +15,6 @@ import {
   ignoreElements,
   map,
   merge,
-  mergeAll,
   mergeMap,
   of,
   scan,
@@ -26,7 +25,7 @@ import { KeyPackage } from "ts-mls";
 
 import { user$ } from "./accounts";
 import { marmotClient$ } from "./marmot-client";
-import { cacheRequest, eventStore, pool } from "./nostr";
+import { eventStore, pool } from "./nostr";
 import { extraRelays$ } from "./settings";
 
 /** Observable of current user's key package relay list */
@@ -76,9 +75,6 @@ export const publishedKeyPackages$ = combineLatest([
     const load = pool
       .subscription(readKeyPackageRelays$, filter)
       .pipe(onlyEvents());
-    // Observable to load events from cache
-    const cache = defer(() => cacheRequest(filter)).pipe(mergeAll());
-
     // Observable: all current matching events first, then live updates from the store.
     // eventStore.filters(filter) is shared with ReplaySubject(1), so late subscribers
     // only see the last event; seeding with getByFilters ensures we get the full set.
@@ -112,7 +108,7 @@ export const publishedKeyPackages$ = combineLatest([
     );
 
     return merge(
-      merge(load, cache).pipe(
+      load.pipe(
         // Send all events to the store
         mapEventsToStore(eventStore),
         // Ingore events
