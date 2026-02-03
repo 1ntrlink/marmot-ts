@@ -62,8 +62,6 @@ jobs:
 
       - name: Build Chat
         working-directory: chat
-        env:
-          VITE_REPO_BRANCH: ${{ github.ref_name }}
         run: pnpm build
 
       - name: Upload Chat Artifact
