@@ -62,7 +62,7 @@ jobs:
 
       - name: Build Chat
         working-directory: chat
-        run: pnpm build
+        run: pnpm build --base /marmot-ts/
 
       - name: Upload Chat Artifact
         uses: actions/upload-artifact@v4
