@@ -76,7 +76,7 @@ export const marmotClient$ = combineLatest([
     // Create a KeyValueGroupStateBackend wrapping localforage
     const groupStateBackend = new KeyValueGroupStateBackend(
       localforage.createInstance({
-        name: "marmot-group-store",
+        name: `marmot-group-store-${account.pubkey}`,
       }),
     );
 
@@ -121,7 +121,7 @@ marmotClient$.subscribe(async (client) => {
 });
 
 // Reconcile subscriptions when client changes and manager is ready
-// Use withLatestFrom to get the latest marmotClient$ value and filter for ready state
+// Obtain the latest marmotClient$ value and ensure manager is ready before reconciling
 marmotClient$
   .pipe(
     filter((client) => {
