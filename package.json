@@ -18,19 +18,19 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/parres-hq/marmot-ts.git"
+    "url": "git+https://github.com/marmot-protocol/marmot-ts.git"
   },
   "keywords": [
     "nostr",
     "mls",
     "marmot"
   ],
-  "author": "Parres",
+  "author": "Marmot Protocol",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/parres-hq/marmot-ts/issues"
+    "url": "https://github.com/marmot-protocol/marmot-ts/issues"
   },
-  "homepage": "https://github.com/parres-hq/marmot-ts#readme",
+  "homepage": "https://github.com/marmot-protocol/marmot-ts#readme",
   "publishConfig": {
     "access": "public"
   },
