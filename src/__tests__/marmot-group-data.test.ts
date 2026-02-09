@@ -2,8 +2,8 @@ import {
   CiphersuiteName,
   ciphersuites,
   createGroup,
-  getCiphersuiteFromName,
   getCiphersuiteImpl,
+  unsafeTestingAuthenticationService,
 } from "ts-mls";
 import { describe, expect, it } from "vitest";
 
@@ -154,7 +154,7 @@ describe("createMarmotGroupData", () => {
     expect(decoded.name).toBe("My Group");
     expect(decoded.description).toBe("My Description");
     expect(decoded.adminPubkeys).toEqual(["a".repeat(64)]);
-    expect(decoded.relays).toEqual(["wss://relay.example.com/"]);
+    expect(decoded.relays).toEqual(["wss://relay.example.com"]);
   });
 });
 
@@ -261,12 +261,12 @@ describe("serialization with byteOffset handling", () => {
   it("should correctly decode extension data from a real MLS group", async () => {
     // Use the first available ciphersuite
     const cipherSuite = Object.keys(ciphersuites)[0] as CiphersuiteName;
-    const impl = await getCiphersuiteImpl(getCiphersuiteFromName(cipherSuite));
+    const impl = await getCiphersuiteImpl(cipherSuite);
 
     // Create a valid nostr credential (64 hex chars)
     const alicePubkey = "a".repeat(64);
     const aliceCredential = {
-      credentialType: "basic" as const,
+      credentialType: (await import("ts-mls")).defaultCredentialTypes.basic,
       identity: new TextEncoder().encode(alicePubkey),
     };
 
@@ -295,13 +295,16 @@ describe("serialization with byteOffset handling", () => {
     const marmotExtension = marmotGroupDataToExtension(marmotGroupData);
 
     // Create group with Marmot extension
-    const clientState = await createGroup(
+    const clientState = await createGroup({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       groupId,
-      alice.publicPackage,
-      alice.privatePackage,
-      [marmotExtension],
-      impl,
-    );
+      keyPackage: alice.publicPackage,
+      privateKeyPackage: alice.privatePackage,
+      extensions: [marmotExtension],
+    });
 
     // Extract the Marmot extension from the created group
     const originalExtension = clientState.groupContext.extensions.find(
@@ -329,18 +332,17 @@ describe("serialization with byteOffset handling", () => {
   });
 
   it("should correctly decode extension data after encodeGroupState/decodeGroupState round-trip", async () => {
-    // Import encodeGroupState and decodeGroupState
-    const { encodeGroupState, decodeGroupState } =
-      await import("ts-mls/clientState.js");
+    const { encode, decode, clientStateEncoder, clientStateDecoder } =
+      await import("ts-mls");
 
     // Use the first available ciphersuite
     const cipherSuite = Object.keys(ciphersuites)[0] as CiphersuiteName;
-    const impl = await getCiphersuiteImpl(getCiphersuiteFromName(cipherSuite));
+    const impl = await getCiphersuiteImpl(cipherSuite);
 
     // Create a valid nostr credential (64 hex chars)
     const alicePubkey = "b".repeat(64);
     const aliceCredential = {
-      credentialType: "basic" as const,
+      credentialType: (await import("ts-mls")).defaultCredentialTypes.basic,
       identity: new TextEncoder().encode(alicePubkey),
     };
 
@@ -374,30 +376,32 @@ describe("serialization with byteOffset handling", () => {
     const marmotExtension = marmotGroupDataToExtension(marmotGroupData);
 
     // Create group with Marmot extension
-    const originalState = await createGroup(
+    const originalState = await createGroup({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       groupId,
-      alice.publicPackage,
-      alice.privatePackage,
-      [marmotExtension],
-      impl,
-    );
+      keyPackage: alice.publicPackage,
+      privateKeyPackage: alice.privatePackage,
+      extensions: [marmotExtension],
+    });
 
     // Serialize the entire ClientState using ts-mls binary serialization
-    const serialized = encodeGroupState(originalState);
+    const serialized = encode(clientStateEncoder, originalState);
 
     // Deserialize the ClientState
-    const deserializedResult = decodeGroupState(serialized, 0);
-    if (!deserializedResult) {
+    const deserializedState = decode(clientStateDecoder, serialized);
+    if (!deserializedState)
       throw new Error("Failed to deserialize ClientState");
-    }
-    const [deserializedState, _bytesRead] = deserializedResult;
 
     // Extract the Marmot extension from the deserialized group
-    const deserializedExtension =
-      deserializedState.groupContext.extensions.find(
-        (ext) =>
-          typeof ext.extensionType === "number" && ext.extensionType === 0xf2ee,
-      );
+    const deserializedExtension = (
+      deserializedState as any
+    ).groupContext.extensions.find(
+      (ext) =>
+        typeof ext.extensionType === "number" && ext.extensionType === 0xf2ee,
+    );
 
     if (!deserializedExtension) {
       throw new Error("Marmot extension not found in deserialized group");

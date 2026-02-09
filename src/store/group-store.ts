@@ -19,11 +19,11 @@ export type GroupStoreOptions = {
 
 type GroupStoreEvents = {
   /** Emitted when a client state is added */
-  clientStateAdded: (clientState: ClientState) => any;
+  clientStateAdded: (clientState: ClientState) => void;
   /** Emitted when a client state is updated */
-  clientStateUpdated: (clientState: ClientState) => any;
+  clientStateUpdated: (clientState: ClientState) => void;
   /** Emitted when a client state is removed */
-  clientStateRemoved: (groupId: Uint8Array) => any;
+  clientStateRemoved: (groupId: Uint8Array) => void;
 };
 
 /**
@@ -94,7 +94,7 @@ export class GroupStore extends EventEmitter<GroupStoreEvents> {
     const storedClientState = serializeClientState(clientState);
 
     await this.backend.setItem(key, storedClientState);
-    this.emit("clientStateAdded", clientState);
+    this.emit("clientStateUpdated", clientState);
 
     return key;
   }

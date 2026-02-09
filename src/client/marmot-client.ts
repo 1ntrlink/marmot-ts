@@ -8,19 +8,13 @@ import {
   ClientState,
   CryptoProvider,
   defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
   joinGroup,
   KeyPackage,
-  makePskIndex,
   PrivateKeyPackage,
 } from "ts-mls";
-import {
-  CiphersuiteId,
-  CiphersuiteName,
-  getCiphersuiteFromId,
-} from "ts-mls/crypto/ciphersuite.js";
+import { CiphersuiteName, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { ClientConfig } from "ts-mls/clientConfig.js";
+import { marmotAuthService } from "../core/auth-service.js";
 import { createCredential } from "../core/credential.js";
 import { defaultCapabilities } from "../core/default-capabilities.js";
 import { createSimpleGroup, SimpleGroupOptions } from "../core/group.js";
@@ -74,19 +68,19 @@ export type InferGroupType<TClient extends MarmotClient<any>> =
 
 type MarmotClientEvents<THistory extends BaseGroupHistory | undefined = any> = {
   /** Emitted when the groups array is updated */
-  groupsUpdated: (groups: MarmotGroup<THistory>[]) => any;
+  groupsUpdated: (groups: MarmotGroup<THistory>[]) => void;
   /** Emitted when a group is loaded from the store */
-  groupLoaded: (group: MarmotGroup<THistory>) => any;
+  groupLoaded: (group: MarmotGroup<THistory>) => void;
   /** Emitted when a new group is created */
-  groupCreated: (group: MarmotGroup<THistory>) => any;
+  groupCreated: (group: MarmotGroup<THistory>) => void;
   /** Emitted when a group is imported from a ClientState object */
-  groupImported: (group: MarmotGroup<THistory>) => any;
+  groupImported: (group: MarmotGroup<THistory>) => void;
   /** Emitted when a group is joined */
-  groupJoined: (group: MarmotGroup<THistory>) => any;
+  groupJoined: (group: MarmotGroup<THistory>) => void;
   /** Emitted when a group is unloaded */
-  groupUnloaded: (groupId: Uint8Array) => any;
+  groupUnloaded: (groupId: Uint8Array) => void;
   /** Emitted when a group is destroyed */
-  groupDestroyed: (groupId: Uint8Array) => any;
+  groupDestroyed: (groupId: Uint8Array) => void;
 };
 
 export class MarmotClient<
@@ -132,15 +126,14 @@ export class MarmotClient<
     ) as GroupHistoryFactory<THistory>;
   }
 
-  /** Get a ciphersuite implementation from a name or id */
-  private async getCiphersuiteImpl(name: CiphersuiteName | CiphersuiteId = 1) {
-    const suite =
-      typeof name === "string"
-        ? getCiphersuiteFromName(name)
-        : getCiphersuiteFromId(name);
-
-    // Get a new ciphersuite implementation
-    return await getCiphersuiteImpl(suite, this.cryptoProvider);
+  /** Get a ciphersuite implementation from a name */
+  private async getCiphersuiteImpl(name?: CiphersuiteName) {
+    // In v2, CryptoProvider.getCiphersuiteImpl takes a numeric ciphersuite id.
+    // We accept a name and map it via the exported `ciphersuites` table.
+    const ciphersuiteName =
+      name ?? "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519";
+    const id = ciphersuites[ciphersuiteName];
+    return await this.cryptoProvider.getCiphersuiteImpl(id);
   }
 
   /** Hydrates a SerializedClientState into a ClientState using this client's config */
@@ -292,7 +285,7 @@ export class MarmotClient<
   async createGroup(
     name: string,
     options?: SimpleGroupOptions & {
-      ciphersuite?: CiphersuiteName | CiphersuiteId;
+      ciphersuite?: CiphersuiteName;
     },
   ): Promise<MarmotGroup<THistory>> {
     const ciphersuiteImpl = await this.getCiphersuiteImpl(options?.ciphersuite);
@@ -327,6 +320,7 @@ export class MarmotClient<
       signer: this.signer,
       network: this.network,
       history: this.historyFactory,
+      clientConfig: this.clientConfig,
     });
 
     // Save the group to the cache
@@ -360,7 +354,8 @@ export class MarmotClient<
       options;
 
     // Decode the Welcome message from the kind 444 event
-    const welcome = getWelcome(welcomeRumor);
+    const mlsWelcome = getWelcome(welcomeRumor);
+    const welcome = mlsWelcome;
 
     // Extract keyPackageEventId from welcome rumor tags if not explicitly provided
     // The keyPackageEventId is stored as an "e" tag in the welcome message per MIP-00
@@ -369,7 +364,12 @@ export class MarmotClient<
       welcomeRumor.tags.find((tag) => tag[0] === "e")?.[1];
 
     // Get the ciphersuite implementation for the Welcome
-    const ciphersuiteImpl = await this.getCiphersuiteImpl(welcome.cipherSuite);
+    // ts-mls v2: welcome.cipherSuite is a numeric CiphersuiteId
+    // Our helper expects a CiphersuiteName, so resolve name from id.
+    const cipherSuiteName = (
+      Object.keys(ciphersuites) as CiphersuiteName[]
+    ).find((key) => ciphersuites[key] === welcome.cipherSuite);
+    const ciphersuiteImpl = await this.getCiphersuiteImpl(cipherSuiteName);
 
     // Find all local KeyPackage candidates with matching cipherSuite
     const allKeyPackages = await this.keyPackageStore.list();
@@ -383,6 +383,7 @@ export class MarmotClient<
     // Collect all key packages with matching cipher suite and compute their KeyPackageRef
     // KeyPackageRef is used to identify which encrypted secret in the welcome is ours (RFC 9420)
     for (const keyPackage of allKeyPackages) {
+      // KeyPackage uses numeric ciphersuite ids; compare directly
       if (keyPackage.publicPackage.cipherSuite !== welcome.cipherSuite) {
         continue;
       }
@@ -394,12 +395,13 @@ export class MarmotClient<
 
       // Check if this key package's ref matches any secret in the welcome
       // This is the RFC 9420 KeyPackageRef matching semantics
-      const hasMatchingSecret = welcome.secrets.some(
-        (secret) =>
-          secret.newMember.length === keyPackage.keyPackageRef.length &&
-          secret.newMember.every(
-            (val, idx) => val === keyPackage.keyPackageRef[idx],
-          ),
+      const hasMatchingSecret = welcome.secrets.some((secret: any) =>
+        secret.newMember.length === keyPackage.keyPackageRef.length
+          ? secret.newMember.every(
+              (val: number, idx: number) =>
+                val === keyPackage.keyPackageRef[idx],
+            )
+          : false,
       );
 
       candidatePackages.push({
@@ -430,9 +432,6 @@ export class MarmotClient<
       ...candidatePackages.filter((p) => !p.hasMatchingSecret),
     ];
 
-    // Create an empty PSK index (no pre-shared keys for now)
-    const pskIndex = makePskIndex(undefined, {});
-
     // Try each key package in priority order until one successfully decrypts the Welcome message
     let clientState: ClientState | null = null;
     let lastError: Error | null = null;
@@ -440,14 +439,17 @@ export class MarmotClient<
     for (const keyPackage of prioritizedKeyPackages) {
       try {
         // Attempt to join the group with this key package
-        // The joinGroup function internally uses KeyPackageRef to find the correct secret
-        clientState = await joinGroup(
+        // In v2, joinGroup takes a single params object with context
+        clientState = await joinGroup({
+          context: {
+            cipherSuite: ciphersuiteImpl,
+            authService: marmotAuthService,
+            externalPsks: {},
+          },
           welcome,
-          keyPackage.publicPackage,
-          keyPackage.privatePackage,
-          pskIndex,
-          ciphersuiteImpl,
-        );
+          keyPackage: keyPackage.publicPackage,
+          privateKeys: keyPackage.privatePackage,
+        });
         // If successful, break out of the loop
         break;
       } catch (error) {
@@ -479,6 +481,7 @@ export class MarmotClient<
       signer: this.signer,
       network: this.network,
       history: this.historyFactory,
+      clientConfig: this.clientConfig,
     });
 
     // Add the group to the cache

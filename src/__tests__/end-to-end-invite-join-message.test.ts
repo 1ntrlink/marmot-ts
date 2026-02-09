@@ -5,7 +5,6 @@ import { getEventHash, type NostrEvent } from "nostr-tools";
 import {
   CiphersuiteImpl,
   defaultCryptoProvider,
-  getCiphersuiteFromName,
   getCiphersuiteImpl,
 } from "ts-mls";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -52,7 +51,7 @@ describe("End-to-end: invite, join, first message", () => {
 
     // Initialize ciphersuite
     ciphersuite = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 

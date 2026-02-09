@@ -1,12 +1,8 @@
 import { NostrEvent, relaySet, UnsignedEvent } from "applesauce-core/helpers";
 import { useEffect, useState } from "react";
 import { combineLatest, EMPTY, map, switchMap } from "rxjs";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-} from "ts-mls";
-import { CiphersuiteName } from "ts-mls/crypto/ciphersuite.js";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
+import type { CiphersuiteName } from "ts-mls";
 import { KeyPackage } from "ts-mls/keyPackage.js";
 
 import {
@@ -302,9 +298,8 @@ function useKeyPackageCreation() {
       const pubkey = account.pubkey;
 
       // Get cipher suite implementation
-      const selectedCiphersuite = getCiphersuiteFromName(cipherSuite);
       const ciphersuiteImpl = await getCiphersuiteImpl(
-        selectedCiphersuite,
+        cipherSuite,
         defaultCryptoProvider,
       );
 

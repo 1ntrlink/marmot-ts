@@ -11,14 +11,15 @@ export const selectedGroupId$ = new BehaviorSubject<string | null>(null);
 // The onUpdate callback still fires to notify other parts of the app about changes.
 export const groupStore$ = accounts.active$.pipe(
   map((account) => {
+    // IMPORTANT: keep this storage namespace in sync with the backend used by
+    // [`examples.src.lib.marmot-client.ts`](examples/src/lib/marmot-client.ts:77).
+    // Otherwise groups created via MarmotClient won't appear in UIs that read
+    // from GroupStore (e.g. Add Member).
     return new GroupStore(
       localforage.createInstance({
-        name: "marmot-group-store",
+        name: `marmot-group-store-${account?.pubkey ?? "anon"}`,
       }),
       defaultMarmotClientConfig,
-      {
-        prefix: account?.pubkey ?? "anon",
-      },
     );
   }),
   shareReplay(1),

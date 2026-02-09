@@ -1,10 +1,8 @@
 import { randomBytes } from "@noble/hashes/utils.js";
-import {
-  CiphersuiteImpl,
-  Extension,
-  createGroup as MLSCreateGroup,
-} from "ts-mls";
+import { CiphersuiteImpl, createGroup as MLSCreateGroup } from "ts-mls";
 import { ClientState } from "ts-mls/clientState.js";
+import { GroupContextExtension } from "ts-mls";
+import { marmotAuthService } from "./auth-service.js";
 import { CompleteKeyPackage } from "./key-package.js";
 import { marmotGroupDataToExtension } from "./marmot-group-data.js";
 import { MarmotGroupData } from "./protocol.js";
@@ -18,7 +16,7 @@ export interface CreateGroupParams {
   /** Marmot Group Data configuration */
   marmotGroupData: MarmotGroupData;
   /** Additional group context extensions (optional) */
-  extensions?: Extension[];
+  extensions?: GroupContextExtension[];
   /** Cipher suite implementation for cryptographic operations */
   ciphersuiteImpl: CiphersuiteImpl;
 }
@@ -58,13 +56,17 @@ export async function createGroup(
   const groupExtensions = [marmotExtension, ...extensions];
 
   // Create the MLS group using ts-mls primitives and capture the ClientState
-  const clientState = await MLSCreateGroup(
+  // In v2, createGroup takes a single params object with context
+  const clientState = await MLSCreateGroup({
+    context: {
+      cipherSuite: ciphersuiteImpl,
+      authService: marmotAuthService,
+    },
     groupId,
-    creatorKeyPackage.publicPackage,
-    creatorKeyPackage.privatePackage,
-    groupExtensions,
-    ciphersuiteImpl,
-  );
+    keyPackage: creatorKeyPackage.publicPackage,
+    privateKeyPackage: creatorKeyPackage.privatePackage,
+    extensions: groupExtensions,
+  });
 
   return {
     clientState,

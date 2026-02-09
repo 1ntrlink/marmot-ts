@@ -9,25 +9,24 @@ import {
   createCommit,
   CreateCommitOptions,
   createProposal,
+  contentTypes,
   CryptoProvider,
-  emptyPskIndex,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
   processMessage,
   type ProcessMessageResult,
   Proposal,
+  wireformats,
 } from "ts-mls";
 import {
   acceptAll,
   type IncomingMessageCallback,
 } from "ts-mls/incomingMessageAction.js";
-import { MLSMessage } from "ts-mls/message.js";
 import { getCredentialFromLeafIndex } from "ts-mls/ratchetTree.js";
 import { type LeafIndex, toLeafIndex } from "ts-mls/treemath.js";
 import {
   extractMarmotGroupData,
   serializeClientState,
 } from "../../core/client-state.js";
+import { defaultMarmotClientConfig } from "../../core/client-state.js";
 import { getCredentialPubkey } from "../../core/credential.js";
 import {
   createGroupEvent,
@@ -48,6 +47,7 @@ import {
   NoRelayReceivedEventError,
 } from "../errors.js";
 import { NostrNetworkInterface, PublishResponse } from "../nostr-interface.js";
+import { marmotAuthService } from "../../core/auth-service.js";
 import { proposeInviteUser } from "./proposals/invite-user.js";
 
 /**
@@ -94,6 +94,8 @@ export type MarmotGroupOptions<
   ciphersuite: CiphersuiteImpl;
   /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
   network: NostrNetworkInterface;
+  /** Authentication policy/config used when processing MLS messages */
+  clientConfig?: import("ts-mls/clientConfig.js").ClientConfig;
   /** The storage interface for the groups application message history (optional) */
   history?: THistory | GroupHistoryFactory<THistory>;
 };
@@ -151,15 +153,15 @@ export function createAdminCommitPolicyCallback(args: {
 /** Map of events that can be emitted by a MarmotGroup */
 type MarmotGroupEvents<THistory extends BaseGroupHistory | undefined = any> = {
   /** Emitted when the group state is updated */
-  stateChanged: (state: ClientState) => any;
+  stateChanged: (state: ClientState) => void;
   /** Emitted when a new application message is received */
-  applicationMessage: (message: Uint8Array) => any;
+  applicationMessage: (message: Uint8Array) => void;
   /** Emitted when the group state is saved */
-  stateSaved: (group: MarmotGroup<THistory>) => any;
+  stateSaved: (group: MarmotGroup<THistory>) => void;
   /** Emitted when the group is destroyed */
-  destroyed: (group: MarmotGroup<THistory>) => any;
+  destroyed: (group: MarmotGroup<THistory>) => void;
   /** Emitted when history persistence fails (best-effort, non-blocking) */
-  historyError: (error: Error) => any;
+  historyError: (error: Error) => void;
 };
 
 /**
@@ -183,6 +185,9 @@ export class MarmotGroup<
 
   /** The storage interface for the groups application message history */
   readonly history: THistory;
+
+  /** ClientConfig used for policy knobs when processing incoming MLS messages */
+  readonly clientConfig: import("ts-mls/clientConfig.js").ClientConfig;
 
   /** Whether group state has been modified */
   dirty = false;
@@ -237,6 +242,8 @@ export class MarmotGroup<
     this.signer = options.signer;
     this.ciphersuite = options.ciphersuite;
     this.network = options.network;
+    // Default to the library's default client config (contains authService + policy).
+    this.clientConfig = options.clientConfig ?? defaultMarmotClientConfig;
 
     // Create the history store (optional)
     if (options.history) {
@@ -263,9 +270,11 @@ export class MarmotGroup<
     },
   ): Promise<MarmotGroup<THistory>> {
     // Get the group's ciphersuite implementation
-    const cipherSuite = await getCiphersuiteImpl(
-      getCiphersuiteFromName(state.groupContext.cipherSuite),
-      options.cryptoProvider,
+    // In v2, getCiphersuiteImpl is available on the cryptoProvider and takes a CiphersuiteName directly
+    const cryptoProvider =
+      options.cryptoProvider ?? (await import("ts-mls")).defaultCryptoProvider;
+    const cipherSuite = await cryptoProvider.getCiphersuiteImpl(
+      state.groupContext.cipherSuite,
     );
 
     return new MarmotGroup(state, { ...options, ciphersuite: cipherSuite });
@@ -345,12 +354,18 @@ export class MarmotGroup<
     // 1. The proposal will be received back from relays and processed via ingest()
     // 2. When processed via ingest(), it will be added to state.unappliedProposals
     // 3. If you need to commit immediately with this proposal, pass it explicitly to commit()
-    const { message } = await createProposal(
-      this.state,
-      false, // private message
+    // In v2, createProposal takes a single params object with context
+    const { message } = await createProposal({
+      context: {
+        cipherSuite: this.ciphersuite,
+        // ts-mls v2: authService is part of MlsContext, not ClientConfig
+        authService: marmotAuthService,
+        externalPsks: {},
+      },
+      state: this.state,
       proposal,
-      this.ciphersuite,
-    );
+      wireAsPublicMessage: false,
+    });
 
     // Wrap the message in a group event
     const proposalEvent = await createGroupEvent({
@@ -380,18 +395,20 @@ export class MarmotGroup<
     const applicationData = serializeApplicationRumor(rumor);
 
     // Create the application message using ts-mls
-    const { newState, privateMessage } = await createApplicationMessage(
-      this.state,
-      applicationData,
-      this.ciphersuite,
-    );
+    // In v2, createApplicationMessage takes a single params object with context
+    const { newState, message } = await createApplicationMessage({
+      context: {
+        cipherSuite: this.ciphersuite,
+        // ts-mls v2: authService is part of MlsContext, not ClientConfig
+        authService: marmotAuthService,
+        externalPsks: {},
+      },
+      state: this.state,
+      message: applicationData,
+    });
 
-    // Convert PrivateMessage to MLSMessage by wrapping it in the proper structure
-    const mlsMessage: MLSMessage = {
-      version: this.state.groupContext.version,
-      wireformat: "mls_private_message",
-      privateMessage,
-    };
+    // The message returned is the MLS message (not privateMessage directly)
+    const mlsMessage = message;
 
     // Wrap the message in a group event
     // Use this.state (not newState) to get the exporter_secret for the current epoch
@@ -496,10 +513,16 @@ export class MarmotGroup<
     }
 
     // Create the commit
-    const { commit, newState, welcome } = await createCommit(
-      { state: this.state, cipherSuite: this.ciphersuite },
-      commitOptions,
-    );
+    // In v2, createCommit takes a single params object with context
+    const { commit, newState, welcome } = await createCommit({
+      context: {
+        cipherSuite: this.ciphersuite,
+        // ts-mls v2: authService is part of MlsContext, not ClientConfig
+        authService: marmotAuthService,
+      },
+      state: this.state,
+      ...commitOptions,
+    });
 
     // Wrap the commit in a group event
     // Use this.state (not newState) to get the exporter_secret for the current epoch
@@ -535,68 +558,78 @@ export class MarmotGroup<
       );
 
       // Send all welcome events in parallel
-      await Promise.allSettled(
-        options.welcomeRecipients.map(async (recipient) => {
-          const welcomeRumor = createWelcomeRumor({
-            welcome,
-            author: actorPubkey,
-            groupRelays: groupData.relays,
-            keyPackageEventId: recipient.keyPackageEventId,
-          });
+      // In v2, welcome is wrapped in MlsWelcomeMessage, need to access welcome.welcome
+      const innerWelcome = welcome?.welcome;
+      if (!innerWelcome) {
+        // If the library returns a welcome wrapper without the actual Welcome,
+        // we still return the commit publish response.
+        console.warn(
+          "[MarmotGroup.commit] createCommit returned a welcome wrapper without an inner welcome; skipping welcome delivery",
+        );
+      } else {
+        await Promise.allSettled(
+          options.welcomeRecipients.map(async (recipient) => {
+            const welcomeRumor = createWelcomeRumor({
+              welcome: innerWelcome,
+              author: actorPubkey,
+              groupRelays: groupData.relays,
+              keyPackageEventId: recipient.keyPackageEventId,
+            });
 
-          // Gift wrap the welcome event to the newly added user
-          const giftWrapEvent = await createGiftWrap({
-            rumor: welcomeRumor,
-            recipient: recipient.pubkey,
-            signer: this.signer,
-          });
+            // Gift wrap the welcome event to the newly added user
+            const giftWrapEvent = await createGiftWrap({
+              rumor: welcomeRumor,
+              recipient: recipient.pubkey,
+              signer: this.signer,
+            });
 
-          // Get the newly added user's inbox relays using the GroupNostrInterface
-          // Fallback to group relays if inbox relays are not available
-          let inboxRelays: string[];
-          try {
-            inboxRelays = await this.network.getUserInboxRelays(
-              recipient.pubkey,
-            );
-            console.log(
-              `[MarmotGroup.commit] Retrieved inbox relays for recipient:`,
+            // Get the newly added user's inbox relays using the GroupNostrInterface
+            // Fallback to group relays if inbox relays are not available
+            let inboxRelays: string[];
+            try {
+              inboxRelays = await this.network.getUserInboxRelays(
+                recipient.pubkey,
+              );
+              console.log(
+                `[MarmotGroup.commit] Retrieved inbox relays for recipient:`,
+                inboxRelays,
+              );
+            } catch (error) {
+              console.warn(
+                `[MarmotGroup.commit] Failed to get inbox relays for recipient ${recipient.pubkey.slice(
+                  0,
+                  16,
+                )}...:`,
+                error,
+              );
+              // Fallback to group relays
+              inboxRelays = groupData.relays || [];
+            }
+
+            if (inboxRelays.length === 0) {
+              console.warn(
+                `No relays available to send Welcome to recipient ${recipient.pubkey.slice(
+                  0,
+                  16,
+                )}...`,
+              );
+              return;
+            }
+
+            const publishResult = await this.network.publish(
               inboxRelays,
+              giftWrapEvent,
             );
-          } catch (error) {
-            console.warn(
-              `[MarmotGroup.commit] Failed to get inbox relays for recipient ${recipient.pubkey.slice(
-                0,
-                16,
-              )}...:`,
-              error,
+
+            console.log(
+              `[MarmotGroup.commit] Gift wrap publish result:`,
+              publishResult,
             );
-            // Fallback to group relays
-            inboxRelays = groupData.relays || [];
-          }
 
-          if (inboxRelays.length === 0) {
-            console.warn(
-              `No relays available to send Welcome to recipient ${recipient.pubkey.slice(
-                0,
-                16,
-              )}...`,
-            );
-            return;
-          }
-
-          const publishResult = await this.network.publish(
-            inboxRelays,
-            giftWrapEvent,
-          );
-
-          console.log(
-            `[MarmotGroup.commit] Gift wrap publish result:`,
-            publishResult,
-          );
-
-          // TODO: need to detect publish failure to attempt to send later
-        }),
-      );
+            // TODO: need to detect publish failure to attempt to send later
+          }),
+        );
+      }
     }
 
     return response;
@@ -745,7 +778,7 @@ export class MarmotGroup<
     for (const pair of read) {
       if (
         isPrivateMessage(pair.message) &&
-        pair.message.privateMessage.contentType === "commit"
+        pair.message.privateMessage.contentType === contentTypes.commit
       ) {
         commits.push(pair);
       } else {
@@ -766,8 +799,8 @@ export class MarmotGroup<
       try {
         // Skip non-private/public messages (welcome, groupInfo, keyPackage, etc.)
         if (
-          message.wireformat !== "mls_private_message" &&
-          message.wireformat !== "mls_public_message"
+          message.wireformat !== wireformats.mls_private_message &&
+          message.wireformat !== wireformats.mls_public_message
         ) {
           continue;
         }
@@ -776,13 +809,18 @@ export class MarmotGroup<
         // - Proposals: Adds them to state.unappliedProposals (keyed by proposal reference)
         // - Application messages: Decrypts content and returns it
         // - Both update state as needed (for forward secrecy)
-        const result = await processMessage(
+        // In v2, processMessage takes a single params object with context
+        const result = await processMessage({
+          context: {
+            cipherSuite: this.ciphersuite,
+            // ts-mls v2: authService is part of MlsContext, not ClientConfig
+            authService: marmotAuthService,
+            externalPsks: {},
+          },
+          state: this.state,
           message,
-          this.state,
-          emptyPskIndex,
-          acceptAll, // Accept all proposals (adds them to unappliedProposals)
-          this.ciphersuite,
-        );
+          callback: acceptAll, // Accept all proposals (adds them to unappliedProposals)
+        });
 
         // Update state if message changed it
         if (result.kind === "newState") {
@@ -853,13 +891,17 @@ export class MarmotGroup<
         // - Verifies message authenticity and sender
         // - Resolves proposal references from state.unappliedProposals (if needed)
         // - Applies the commit (updates ratchet tree, advances epoch, rotates keys)
-        const result = await processMessage(
+        // In v2, processMessage takes a single params object with context
+        const result = await processMessage({
+          context: {
+            cipherSuite: this.ciphersuite,
+            authService: marmotAuthService,
+            externalPsks: {},
+          },
+          state: this.state,
           message,
-          this.state,
-          emptyPskIndex,
-          adminCallback, // Use admin verification callback for commits
-          this.ciphersuite,
-        );
+          callback: adminCallback, // Use admin verification callback for commits
+        });
 
         if (result.kind === "newState") {
           // If the commit was rejected by the callback (admin verification),

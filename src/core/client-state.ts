@@ -1,12 +1,8 @@
 import { bytesToHex } from "@noble/hashes/utils.js";
 import { ClientConfig, defaultClientConfig } from "ts-mls/clientConfig.js";
-import {
-  ClientState,
-  encodeGroupState,
-  decodeGroupState,
-} from "ts-mls/clientState.js";
-import { Extension } from "ts-mls/extension.js";
-import { marmotAuthService } from "./auth-service.js";
+import { ClientState, encode, decode, nodeTypes } from "ts-mls";
+import { clientStateEncoder, clientStateDecoder } from "ts-mls/clientState.js";
+import { CustomExtension } from "ts-mls";
 import { decodeMarmotGroupData } from "./marmot-group-data.js";
 import {
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
@@ -16,7 +12,6 @@ import {
 /** Default ClientConfig for Marmot */
 export const defaultMarmotClientConfig = {
   ...defaultClientConfig,
-  auth_service: marmotAuthService,
 };
 
 /**
@@ -30,14 +25,15 @@ export function extractMarmotGroupData(
 ): MarmotGroupData | null {
   try {
     const marmotExtension = clientState.groupContext.extensions.find(
-      (ext: Extension) =>
+      (ext: { extensionType: number }) =>
         typeof ext.extensionType === "number" &&
         ext.extensionType === MARMOT_GROUP_DATA_EXTENSION_TYPE,
     );
 
     if (!marmotExtension) return null;
 
-    return decodeMarmotGroupData(marmotExtension.extensionData);
+    const customExt = marmotExtension as CustomExtension;
+    return decodeMarmotGroupData(customExt.extensionData);
   } catch (error) {
     console.error("Failed to extract MarmotGroupData:", error);
     return null;
@@ -61,6 +57,9 @@ export function getGroupIdHex(clientState: ClientState): string {
  * @returns Hex string representation of the Nostr group ID
  */
 export function getNostrGroupIdHex(clientState: ClientState): string {
+  if (clientState.groupContext.groupId) {
+    return bytesToHex(clientState.groupContext.groupId);
+  }
   const marmotData = extractMarmotGroupData(clientState);
   if (!marmotData) {
     throw new Error("MarmotGroupData not found in ClientState");
@@ -86,7 +85,7 @@ export function getEpoch(clientState: ClientState): number {
  */
 export function getMemberCount(clientState: ClientState): number {
   return clientState.ratchetTree.filter(
-    (node) => node && node.nodeType === "leaf",
+    (node) => node && node.nodeType === nodeTypes.leaf,
   ).length;
 }
 
@@ -106,7 +105,7 @@ export type SerializedClientState = Uint8Array;
 export function serializeClientState(
   state: ClientState,
 ): SerializedClientState {
-  return encodeGroupState(state);
+  return encode(clientStateEncoder, state);
 }
 
 /**
@@ -120,17 +119,18 @@ export function serializeClientState(
  */
 export function deserializeClientState(
   stored: SerializedClientState,
-  config: ClientConfig,
+  _config: ClientConfig,
 ): ClientState {
   try {
-    const decoded = decodeGroupState(stored, 0);
+    const decoded = decode(clientStateDecoder, stored);
     if (!decoded) {
       throw new Error(
         "Failed to deserialize ClientState: decodeGroupState returned null",
       );
     }
-    // Inject the config back into the state
-    return { ...decoded[0], clientConfig: config };
+    // ts-mls v2: ClientState no longer carries clientConfig; the config is provided
+    // via MlsContext.clientConfig when processing messages.
+    return decoded;
   } catch (error) {
     if (error instanceof Error) {
       throw new Error(`Failed to deserialize ClientState: ${error.message}`);

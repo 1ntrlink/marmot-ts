@@ -1,9 +1,5 @@
 import { unixNow } from "applesauce-core/helpers";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-} from "ts-mls";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
 import { Capabilities } from "ts-mls/capabilities.js";
 import { Extension } from "ts-mls/extension.js";
 import { describe, expect, it } from "vitest";
@@ -22,7 +18,7 @@ describe("generateKeyPackage", () => {
   it("should generate a valid key package with default capabilities", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -42,7 +38,7 @@ describe("generateKeyPackage", () => {
   it("should include Marmot Group Data Extension in capabilities", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -60,7 +56,7 @@ describe("generateKeyPackage", () => {
   it("should include last_resort extension by default", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -81,7 +77,7 @@ describe("generateKeyPackage", () => {
   it("should accept custom capabilities and still ensure Marmot capabilities", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -111,7 +107,7 @@ describe("generateKeyPackage", () => {
   it("should accept custom extensions and still ensure last_resort extension", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -148,7 +144,7 @@ describe("generateKeyPackage", () => {
   it("should accept custom lifetime", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -173,7 +169,7 @@ describe("generateKeyPackage", () => {
     };
 
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 

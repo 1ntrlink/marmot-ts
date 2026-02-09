@@ -3,15 +3,17 @@ import { EventSigner } from "applesauce-core";
 import {
   CiphersuiteImpl,
   createApplicationMessage,
+  createCommit,
   createProposal,
   defaultCryptoProvider,
-  getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
+  unsafeTestingAuthenticationService,
+  defaultProposalTypes,
 } from "ts-mls";
 import type { ClientState } from "ts-mls/clientState.js";
-import { decodeGroupState, encodeGroupState } from "ts-mls/clientState.js";
-import { createCommit } from "ts-mls/createCommit.js";
+import { clientStateDecoder, clientStateEncoder } from "ts-mls/clientState.js";
+import { decode, encode } from "ts-mls";
 import { describe, expect, it } from "vitest";
 
 import { MarmotGroup } from "../client/group/marmot-group.js";
@@ -72,7 +74,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
   it("applies exactly one commit for an epoch (earliest created_at wins), even if events arrive reversed", async () => {
     const adminPubkey = "a".repeat(64);
     const impl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -95,31 +97,36 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     });
 
     const addProposal = {
-      proposalType: "add" as const,
+      proposalType: defaultProposalTypes.add,
       add: { keyPackage: memberKeyPackage.publicPackage },
     };
 
     // Admin creates an add commit and obtains a welcome for the new member.
-    const { newState: adminStateEpoch1, welcome } = await createCommit(
-      { state: createdState, cipherSuite: impl },
-      {
-        wireAsPublicMessage: false,
-        extraProposals: [addProposal],
-        ratchetTreeExtension: true, // Include ratchet tree in Welcome so members can join without external tree
+    const { newState: adminStateEpoch1, welcome } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
       },
-    );
+      state: createdState,
+      wireAsPublicMessage: false,
+      extraProposals: [addProposal as any],
+      ratchetTreeExtension: true, // Include ratchet tree in Welcome so members can join without external tree
+    });
 
     expect(welcome).toBeTruthy();
 
     // New member joins from the Welcome, producing a full ClientState they can use to create commits.
     // The Welcome now includes the ratchet_tree extension, so no external tree is needed.
-    const memberStateEpoch1 = await joinGroup(
-      welcome!,
-      memberKeyPackage.publicPackage,
-      memberKeyPackage.privatePackage,
-      { findPsk: () => undefined },
-      impl,
-    );
+    const memberStateEpoch1 = await joinGroup({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      welcome: (welcome as any).welcome ?? (welcome as any),
+      keyPackage: memberKeyPackage.publicPackage,
+      privateKeys: memberKeyPackage.privatePackage,
+      ratchetTree: undefined,
+    });
 
     // Create two competing commits from the same baseline ADMIN state (epoch 1).
     // Per MIP-03, only admins are allowed to send commits, so both commits must be
@@ -128,16 +135,20 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     // NOTE: In MLS, creating a commit updates the sender's leaf key pair, so we cannot
     // create two commits from the same ClientState object. We must clone the state first.
     const commitA = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       state: adminStateEpoch1,
-      cipherSuite: impl,
+      extraProposals: [],
     });
 
     // Clone the baseline admin state to create a second independent copy for commitB.
     // ClientState = GroupState + clientConfig, so preserve clientConfig.
-    const decodedAdminGroupState = decodeGroupState(
-      encodeGroupState(adminStateEpoch1),
-      0,
-    )?.[0];
+    const decodedAdminGroupState = decode(
+      clientStateDecoder,
+      encode(clientStateEncoder, adminStateEpoch1) as any,
+    ) as any;
     if (!decodedAdminGroupState) {
       throw new Error("Failed to clone adminStateEpoch1");
     }
@@ -147,8 +158,12 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     };
 
     const commitB = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       state: adminStateEpoch1Clone,
-      cipherSuite: impl,
+      extraProposals: [],
     });
 
     // Encrypt commits using the exporter_secret for the current epoch (baseline state),
@@ -186,7 +201,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     // UpdatePath secrets are encrypted to *other* members.
     await stateStore.set(
       memberStateEpoch1.groupContext.groupId,
-      encodeGroupState(memberStateEpoch1),
+      encode(clientStateEncoder, memberStateEpoch1) as any,
     );
 
     const network: NostrNetworkInterface = {
@@ -231,7 +246,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       memberStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decodeGroupState(reloadedBytes!, 0)?.[0];
+    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(group.state.groupContext.epoch);
   });
@@ -239,7 +254,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
   it("persists application message epoch advancement (forward secrecy)", async () => {
     const adminPubkey = "a".repeat(64);
     const impl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -262,14 +277,22 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       add: { keyPackage: memberKeyPackage.publicPackage },
     };
 
-    const { newState: adminStateEpoch1, welcome } = await createCommit(
-      { state: createdState, cipherSuite: impl },
-      {
-        wireAsPublicMessage: false,
-        extraProposals: [addProposal],
-        ratchetTreeExtension: true,
+    const { defaultProposalTypes } = await import("ts-mls");
+    const addProposalTyped = {
+      proposalType: defaultProposalTypes.add,
+      add: { keyPackage: memberKeyPackage.publicPackage },
+    };
+
+    const { newState: adminStateEpoch1, welcome } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
       },
-    );
+      state: createdState,
+      wireAsPublicMessage: false,
+      extraProposals: [addProposalTyped as any],
+      ratchetTreeExtension: true,
+    });
 
     expect(welcome).toBeTruthy();
 
@@ -280,7 +303,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     );
     await stateStore.set(
       adminStateEpoch1.groupContext.groupId,
-      encodeGroupState(adminStateEpoch1),
+      encode(clientStateEncoder, adminStateEpoch1) as any,
     );
 
     const network: NostrNetworkInterface = {
@@ -324,20 +347,17 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
 
     // Send application message through MarmotGroup
     // This should update state for forward secrecy and persist it
-    const { newState, privateMessage } = await createApplicationMessage(
-      group.state,
-      new TextEncoder().encode(JSON.stringify(rumor)),
-      impl,
-    );
-
-    const mlsMessage = {
-      version: group.state.groupContext.version,
-      wireformat: "mls_private_message" as const,
-      privateMessage,
-    };
+    const { newState, message: mlsMessage } = await createApplicationMessage({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      state: group.state,
+      message: new TextEncoder().encode(JSON.stringify(rumor)),
+    });
 
     const applicationEvent = await createGroupEvent({
-      message: mlsMessage,
+      message: mlsMessage as any,
       state: group.state,
       ciphersuite: impl,
     });
@@ -360,7 +380,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       adminStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decodeGroupState(reloadedBytes!, 0)?.[0];
+    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(initialEpoch);
   });
@@ -368,7 +388,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
   it("processes proposals before commits (proposal/commit integration)", async () => {
     const adminPubkey = "a".repeat(64);
     const impl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -386,20 +406,23 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       ciphersuiteImpl: impl,
     });
 
+    const { defaultProposalTypes } = await import("ts-mls");
     const addProposal1 = {
-      proposalType: "add" as const,
+      proposalType: defaultProposalTypes.add,
       add: { keyPackage: member1KeyPackage.publicPackage },
     };
 
     const { newState: adminStateEpoch1, welcome: welcome1 } =
-      await createCommit(
-        { state: createdState, cipherSuite: impl },
-        {
-          wireAsPublicMessage: false,
-          extraProposals: [addProposal1],
-          ratchetTreeExtension: true,
+      await createCommit({
+        context: {
+          cipherSuite: impl,
+          authService: unsafeTestingAuthenticationService,
         },
-      );
+        state: createdState,
+        wireAsPublicMessage: false,
+        extraProposals: [addProposal1 as any],
+        ratchetTreeExtension: true,
+      });
 
     expect(welcome1).toBeTruthy();
 
@@ -410,7 +433,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     );
     await stateStore.set(
       adminStateEpoch1.groupContext.groupId,
-      encodeGroupState(adminStateEpoch1),
+      encode(clientStateEncoder, adminStateEpoch1) as any,
     );
 
     const network: NostrNetworkInterface = {
@@ -448,17 +471,20 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     });
 
     const addProposal2 = {
-      proposalType: "add" as const,
+      proposalType: defaultProposalTypes.add,
       add: { keyPackage: member2KeyPackage.publicPackage },
     };
 
     // Create proposal message
-    const { message: proposalMessage } = await createProposal(
-      group.state,
-      false, // private message
-      addProposal2,
-      impl,
-    );
+    const { message: proposalMessage } = await createProposal({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      state: group.state,
+      proposal: addProposal2 as any,
+      wireAsPublicMessage: false,
+    });
 
     const proposalEvent = await createGroupEvent({
       message: proposalMessage,
@@ -480,13 +506,15 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     expect(Object.keys(group.state.unappliedProposals).length).toBe(1);
 
     // Now create a commit that uses proposals from unappliedProposals
-    const { commit: commitMessage } = await createCommit(
-      { state: group.state, cipherSuite: impl },
-      {
-        wireAsPublicMessage: false,
-        // Don't pass extraProposals - let createCommit use unappliedProposals
+    const { commit: commitMessage } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
       },
-    );
+      state: group.state,
+      wireAsPublicMessage: false,
+      // Don't pass extraProposals - let createCommit use unappliedProposals
+    });
 
     const commitEvent = await createGroupEvent({
       message: commitMessage,
@@ -518,7 +546,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       adminStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decodeGroupState(reloadedBytes!, 0)?.[0];
+    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(group.state.groupContext.epoch);
   });

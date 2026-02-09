@@ -1,9 +1,5 @@
 import { NostrEvent, unixNow } from "applesauce-core/helpers";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-} from "ts-mls";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
 import { describe, expect, it } from "vitest";
 
 import { createCredential } from "../core/credential.js";
@@ -155,7 +151,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should create event with base64 encoding and encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -166,7 +162,6 @@ describe("createKeyPackageEvent encoding", () => {
 
     const event = createKeyPackageEvent({
       keyPackage: keyPackage.publicPackage,
-      pubkey: validPubkey,
       relays: ["wss://relay.example.com"],
     });
 
@@ -186,7 +181,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should be able to decode base64-encoded key package event", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -197,7 +192,6 @@ describe("createKeyPackageEvent encoding", () => {
 
     const event = createKeyPackageEvent({
       keyPackage: originalKeyPackage.publicPackage,
-      pubkey: validPubkey,
       relays: ["wss://relay.example.com"],
     });
 
@@ -217,7 +211,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should still decode legacy hex-encoded events without encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -227,19 +221,20 @@ describe("createKeyPackageEvent encoding", () => {
     });
 
     // Create a legacy event (hex-encoded, no encoding tag)
-    const { encodeKeyPackage } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/ciphers/utils.js");
+    const { encode } = await import("ts-mls");
+    const { keyPackageEncoder } = await import("ts-mls/keyPackage.js");
+    const { bytesToHex } = await import("@noble/hashes/utils.js");
 
-    const encodedBytes = encodeKeyPackage(keyPackage.publicPackage);
+    const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const legacyEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
       created_at: unixNow(),
       content: bytesToHex(encodedBytes), // Hex encoding
       tags: [
-        ["mls_version", "1.0"],
-        ["cipher_suite", "0x0001"],
-        ["extensions", "0x000a"],
+        ["mls_protocol_version", "1.0"],
+        ["mls_ciphersuite", "0x0001"],
+        ["mls_extensions", "0x000a"],
         ["relays", "wss://relay.example.com"],
         // No encoding tag
       ],
@@ -256,7 +251,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should decode hex-encoded events with explicit hex encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -265,19 +260,20 @@ describe("createKeyPackageEvent encoding", () => {
       ciphersuiteImpl,
     });
 
-    const { encodeKeyPackage } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/ciphers/utils.js");
+    const { encode } = await import("ts-mls");
+    const { keyPackageEncoder } = await import("ts-mls/keyPackage.js");
+    const { bytesToHex } = await import("@noble/hashes/utils.js");
 
-    const encodedBytes = encodeKeyPackage(keyPackage.publicPackage);
+    const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const hexEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
       created_at: unixNow(),
       content: bytesToHex(encodedBytes),
       tags: [
-        ["mls_version", "1.0"],
-        ["cipher_suite", "0x0001"],
-        ["extensions", "0x000a"],
+        ["mls_protocol_version", "1.0"],
+        ["mls_ciphersuite", "0x0001"],
+        ["mls_extensions", "0x000a"],
         ["relays", "wss://relay.example.com"],
         ["encoding", "hex"], // Explicit hex tag
       ],

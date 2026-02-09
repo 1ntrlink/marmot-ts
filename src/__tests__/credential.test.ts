@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createCredential, getCredentialPubkey } from "../core/credential.js";
 import { hexToBytes } from "@noble/hashes/utils.js";
 import { CredentialBasic } from "ts-mls/credential.js";
+import { defaultCredentialTypes } from "ts-mls";
 
 const validPubkey =
   "1a9281606d737cf7b3c09ccdaefc47cb2af39c12d8528d54c747b8bd9e34a346";
@@ -13,7 +14,7 @@ describe("createCredential", () => {
     const credential = createCredential(validPubkey);
 
     expect(credential).toBeDefined();
-    expect(credential.credentialType).toBe("basic");
+    expect(credential.credentialType).toBe(defaultCredentialTypes.basic);
     expect(credential.identity).toBeInstanceOf(Uint8Array);
     expect(credential.identity).toEqual(hexToBytes(validPubkey));
   });
@@ -58,7 +59,7 @@ describe("createCredential", () => {
       "1A9281606D737CF7B3C09CCDAEFC47CB2AF39C12D8528D54C747B8BD9E34A346";
     const credential = createCredential(uppercasePubkey);
 
-    expect(credential.credentialType).toBe("basic");
+    expect(credential.credentialType).toBe(defaultCredentialTypes.basic);
     expect(credential.identity).toEqual(hexToBytes(uppercasePubkey));
   });
 
@@ -67,7 +68,7 @@ describe("createCredential", () => {
       "1a9281606D737CF7b3c09CCDAEFC47cb2AF39c12D8528D54c747B8BD9e34A346";
     const credential = createCredential(mixedCasePubkey);
 
-    expect(credential.credentialType).toBe("basic");
+    expect(credential.credentialType).toBe(defaultCredentialTypes.basic);
     expect(credential.identity).toEqual(hexToBytes(mixedCasePubkey));
   });
 
@@ -128,7 +129,7 @@ describe("getCredentialPubkey", () => {
   it("should handle legacy UTF-8 encoded public keys", () => {
     const textEncoder = new TextEncoder();
     const legacyCredential: CredentialBasic = {
-      credentialType: "basic" as const,
+      credentialType: defaultCredentialTypes.basic,
       identity: textEncoder.encode(validPubkey),
     };
 
@@ -139,7 +140,7 @@ describe("getCredentialPubkey", () => {
   it("should reject invalid legacy credentials with non-hex UTF-8", () => {
     const textEncoder = new TextEncoder();
     const invalidLegacyCredential: CredentialBasic = {
-      credentialType: "basic" as const,
+      credentialType: defaultCredentialTypes.basic,
       identity: textEncoder.encode("not-a-valid-hex-string-at-all-really-not"),
     };
 
@@ -150,7 +151,7 @@ describe("getCredentialPubkey", () => {
 
   it("should reject credentials with invalid identity data", () => {
     const invalidCredential: CredentialBasic = {
-      credentialType: "basic" as const,
+      credentialType: defaultCredentialTypes.basic,
       identity: new Uint8Array([1, 2, 3]), // Too short and not valid hex
     };
 

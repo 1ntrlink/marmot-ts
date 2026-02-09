@@ -12,7 +12,6 @@ import {
 } from "rxjs";
 import { map } from "rxjs/operators";
 import { ClientState } from "ts-mls/clientState.js";
-import { getCiphersuiteNameFromId } from "ts-mls/crypto/ciphersuite.js";
 import { getKeyPackageCipherSuiteId } from "../../../../src";
 import { MarmotGroup } from "../../../../src/client/group/marmot-group";
 import { proposeInviteUser } from "../../../../src/client/group/proposals/invite-user.js";
@@ -33,6 +32,7 @@ import { groupStore$ } from "../../lib/group-store";
 import { marmotClient$ } from "../../lib/marmot-client";
 import { pool } from "../../lib/nostr";
 import { extraRelays$ } from "../../lib/settings";
+import { getCiphersuiteNameFromId } from "../../lib/ciphersuite.js";
 
 // ============================================================================
 // State Subjects

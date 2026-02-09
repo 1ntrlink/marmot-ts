@@ -10,10 +10,7 @@ import {
   switchMap,
 } from "rxjs";
 import { KeyPackage } from "ts-mls";
-import {
-  CiphersuiteId,
-  getCiphersuiteNameFromId,
-} from "ts-mls/crypto/ciphersuite.js";
+import type { CiphersuiteId } from "ts-mls";
 import {
   createDeleteKeyPackageEvent,
   getKeyPackage,
@@ -31,6 +28,7 @@ import accounts, { keyPackageRelays$, mailboxes$ } from "../../lib/accounts";
 import { keyPackageStore$ } from "../../lib/key-package-store";
 import { eventStore, pool } from "../../lib/nostr";
 import { extraRelays$ } from "../../lib/settings";
+import { getCiphersuiteNameFromId } from "../../lib/ciphersuite";
 
 // ============================================================================
 // Observables
@@ -346,7 +344,7 @@ interface FilterControlsProps {
   beforeDate: string;
   onBeforeDateChange: (value: string) => void;
   onClearFilters: () => void;
-  availableCipherSuites: CiphersuiteId[];
+  availableCipherSuites: number[];
   availableClients: string[];
 }
 
@@ -581,7 +579,7 @@ function KeyPackageManager() {
 
   // Get unique cipher suites and clients from packages
   const { availableCipherSuites, availableClients } = useMemo(() => {
-    const suites = new Set<CiphersuiteId>();
+    const suites = new Set<number>();
     const clients = new Set<string>();
 
     keyPackages?.forEach((pkg) => {

@@ -1,6 +1,7 @@
 import { ProposalRemove } from "ts-mls/proposal.js";
 import { getPubkeyLeafNodeIndexes } from "../../../core/group-members.js";
 import { ProposalAction } from "../marmot-group.js";
+import { defaultProposalTypes } from "ts-mls";
 
 /**
  * Proposes removing all leaf nodes (devices/clients) for a given Nostr user.
@@ -22,7 +23,7 @@ export function proposeKickUser(
     return leafIndexes.map(
       (leafIndex) =>
         ({
-          proposalType: "remove",
+          proposalType: defaultProposalTypes.remove,
           remove: { removed: leafIndex },
         }) satisfies ProposalRemove,
     );
