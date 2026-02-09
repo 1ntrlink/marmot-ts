@@ -5,7 +5,7 @@ import accounts from "./accounts";
 
 // BehaviorSubject for the currently selected group ID
 export const selectedGroupId$ = new BehaviorSubject<string | null>(null);
-
+// TODO: not reactive after v2 refactor
 // Create and export a shared GroupStore instance
 // Note: This only emits when the account changes, not on every store update.
 // The onUpdate callback still fires to notify other parts of the app about changes.

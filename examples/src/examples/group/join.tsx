@@ -13,7 +13,7 @@ import { marmotClient$ } from "../../lib/marmot-client";
 import { pool } from "../../lib/nostr";
 import { extraRelays$ } from "../../lib/settings";
 import { Rumor, unlockGiftWrap } from "applesauce-common/helpers";
-
+// TODO: not reactive after v2 refactor
 // ============================================================================
 // Types
 // ============================================================================
