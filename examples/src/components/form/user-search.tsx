@@ -88,13 +88,6 @@ function UserSearchTab({ onSelect }: { onSelect: (pubkey: string) => void }) {
   const searchListboxRef = useRef<HTMLUListElement>(null);
   const primal = useMemo(() => new PrimalCache(), []);
 
-  // Cleanup PrimalCache on unmount
-  useEffect(() => {
-    return () => {
-      primal.close();
-    };
-  }, [primal]);
-
   // Search function
   const performSearch = useCallback(
     async (query: string) => {
@@ -437,13 +430,6 @@ export default function UserSearch({
 
   // Create PrimalCache instance
   const primal = useMemo(() => new PrimalCache(), []);
-
-  // Cleanup PrimalCache on unmount
-  useEffect(() => {
-    return () => {
-      primal.close();
-    };
-  }, [primal]);
 
   // Search function
   const performSearch = useCallback(
