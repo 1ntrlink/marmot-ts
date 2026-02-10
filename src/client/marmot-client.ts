@@ -365,12 +365,9 @@ export class MarmotClient<
 
     // Get the ciphersuite implementation for the Welcome
     // ts-mls v2: welcome.cipherSuite is a numeric CiphersuiteId
-    // Our helper expects a CiphersuiteName, so resolve name from id.
-    const cipherSuiteName = (
-      Object.keys(ciphersuites) as CiphersuiteName[]
-    ).find((key) => ciphersuites[key] === welcome.cipherSuite);
-    const ciphersuiteImpl = await this.getCiphersuiteImpl(cipherSuiteName);
-
+    const ciphersuiteImpl = await this.cryptoProvider.getCiphersuiteImpl(
+      welcome.cipherSuite,
+    );
     // Find all local KeyPackage candidates with matching cipherSuite
     const allKeyPackages = await this.keyPackageStore.list();
     const candidatePackages: Array<{

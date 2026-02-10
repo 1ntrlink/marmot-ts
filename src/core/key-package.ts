@@ -5,8 +5,7 @@ import {
 } from "ts-mls";
 import { Capabilities } from "ts-mls/capabilities.js";
 import { Credential } from "ts-mls/credential.js";
-import { CiphersuiteImpl, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
-import { getCiphersuiteImpl } from "ts-mls/crypto/getCiphersuiteImpl.js";
+import { CiphersuiteId, CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { CustomExtension } from "ts-mls";
 import {
   KeyPackage,
@@ -46,19 +45,10 @@ export async function calculateKeyPackageRef(
   cryptoProvider?: CryptoProvider,
 ): Promise<Uint8Array> {
   // In v2, keyPackage.cipherSuite is a numeric ciphersuite id.
-  const csName = Object.keys(ciphersuites).find(
-    (name) =>
-      ciphersuites[name as keyof typeof ciphersuites] ===
-      keyPackage.cipherSuite,
-  );
-  if (!csName) {
-    throw new Error(
-      `Unknown ciphersuite id in key package: ${keyPackage.cipherSuite}`,
-    );
-  }
-  const ciphersuiteImpl = await getCiphersuiteImpl(
-    csName as any,
-    cryptoProvider ?? defaultCryptoProvider,
+  // Prefer id-first handling to avoid reverse mapping name<->id for correctness.
+  const provider = cryptoProvider ?? defaultCryptoProvider;
+  const ciphersuiteImpl = await provider.getCiphersuiteImpl(
+    keyPackage.cipherSuite as CiphersuiteId,
   );
   return await makeKeyPackageRef(keyPackage, ciphersuiteImpl.hash);
 }

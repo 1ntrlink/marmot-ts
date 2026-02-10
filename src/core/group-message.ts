@@ -10,7 +10,7 @@ import { bytesToHex, hexToBytes } from "nostr-tools/utils";
 import { ClientState } from "ts-mls/clientState.js";
 import { CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
 import { mlsExporter } from "ts-mls/keySchedule.js";
-import { decode, encode, wireformats } from "ts-mls";
+import { contentTypes, decode, encode, wireformats } from "ts-mls";
 import {
   mlsMessageDecoder,
   mlsMessageEncoder,
@@ -344,7 +344,7 @@ export function isApplicationMessage(
 } {
   return (
     isPrivateMessage(pair.message) &&
-    pair.message.privateMessage.contentType === 1 // contentTypeValue.application
+    pair.message.privateMessage.contentType === contentTypes.application
   );
 }
 
@@ -358,7 +358,7 @@ export function isCommitMessage(
 } {
   return (
     isPrivateMessage(pair.message) &&
-    pair.message.privateMessage.contentType === 2 // contentTypeValue.commit
+    pair.message.privateMessage.contentType === contentTypes.commit
   );
 }
 
@@ -372,6 +372,6 @@ export function isProposalMessage(
 } {
   return (
     isPrivateMessage(pair.message) &&
-    pair.message.privateMessage.contentType === 3 // contentTypeValue.proposal
+    pair.message.privateMessage.contentType === contentTypes.proposal
   );
 }

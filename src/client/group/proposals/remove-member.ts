@@ -10,7 +10,7 @@ import { defaultProposalTypes } from "ts-mls";
  * @param pubkey - The Nostr public key (hex string) of the user to kick
  * @returns A ProposalBuilder that returns an array of ProposalRemove proposals
  */
-export function proposeKickUser(
+export function proposeRemoveUser(
   pubkey: string,
 ): ProposalAction<ProposalRemove[]> {
   return async ({ state }) => {
