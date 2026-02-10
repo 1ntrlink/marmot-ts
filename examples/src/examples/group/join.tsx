@@ -3,9 +3,11 @@ import { mapEventsToTimeline } from "applesauce-core";
 import { NostrEvent, relaySet } from "applesauce-core/helpers";
 import { BehaviorSubject, of, from } from "rxjs";
 import { map } from "rxjs/operators";
+import type { CiphersuiteId } from "ts-mls";
 import { getMemberCount } from "../../../../src/core/client-state";
 import { extractMarmotGroupData } from "../../../../src/core/client-state";
 import { getWelcome } from "../../../../src/core/welcome";
+import { getCiphersuiteNameFromId } from "../../lib/ciphersuite";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable, useObservableMemo } from "../../hooks/use-observable";
 import accounts from "../../lib/accounts";
@@ -13,7 +15,7 @@ import { marmotClient$ } from "../../lib/marmot-client";
 import { pool } from "../../lib/nostr";
 import { extraRelays$ } from "../../lib/settings";
 import { Rumor, unlockGiftWrap } from "applesauce-common/helpers";
-// TODO: not reactive after v2 refactor
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -23,7 +25,7 @@ interface WelcomeMessage {
   welcomeRumor: Rumor;
   relays: string[];
   keyPackageEventId?: string;
-  cipherSuite?: string;
+  cipherSuite?: CiphersuiteId;
   timestamp: number;
 }
 
@@ -34,6 +36,7 @@ interface WelcomeMessage {
 const selectedWelcome$ = new BehaviorSubject<WelcomeMessage | null>(null);
 const isJoining$ = new BehaviorSubject<boolean>(false);
 const error$ = new BehaviorSubject<string | null>(null);
+const refreshTrigger$ = new BehaviorSubject<number>(0);
 const result$ = new BehaviorSubject<{
   groupId: string;
   groupName: string;
@@ -95,7 +98,7 @@ function WelcomeListItem({
           <div className="flex-1">
             <div className="text-sm text-base-content/70 mb-2">
               {welcome.cipherSuite
-                ? `CipherSuite: ${welcome.cipherSuite}`
+                ? `CipherSuite: ${getCiphersuiteNameFromId(welcome.cipherSuite) ?? "Unknown"} (0x${welcome.cipherSuite.toString(16).padStart(4, "0")})`
                 : "Welcome (kind 444)"}
             </div>
             <div className="text-xs text-base-content/60">
@@ -145,7 +148,9 @@ function WelcomeDetails({ welcome }: { welcome: WelcomeMessage }) {
         <div className="space-y-2">
           <div>
             <span className="font-semibold">CipherSuite:</span>{" "}
-            {welcome.cipherSuite ?? "Unknown"}
+            {welcome.cipherSuite
+              ? `${getCiphersuiteNameFromId(welcome.cipherSuite) ?? "Unknown"} (0x${welcome.cipherSuite.toString(16).padStart(4, "0")})`
+              : "Unknown"}
           </div>
           <div>
             <span className="font-semibold">Relays:</span>{" "}
@@ -258,6 +263,8 @@ export default withSignIn(function JoinGroup() {
   const client = useObservable(marmotClient$);
   const account = accounts.active;
 
+  const refreshCount = useObservable(refreshTrigger$) ?? 0;
+
   // Subscribe to gift-wrapped events (kind 1059) for the current user
   const giftWraps =
     useObservableMemo(() => {
@@ -274,7 +281,7 @@ export default withSignIn(function JoinGroup() {
           mapEventsToTimeline(),
           map((arr) => [...arr]),
         );
-    }, [account]) ?? [];
+    }, [account, refreshCount]) ?? [];
 
   // Process gift wraps to extract Welcome messages
   const welcomeMessages =
@@ -296,9 +303,10 @@ export default withSignIn(function JoinGroup() {
                   // Option A (simple): only use Nostr tags for preview.
                   // We can also decode the Welcome to show ciphersuite, but we do NOT attempt
                   // to extract GroupInfo / MarmotGroupData until we actually join.
-                  let cipherSuite: string | undefined;
+                  let cipherSuite: CiphersuiteId | undefined;
                   try {
-                    cipherSuite = getWelcome(rumor).cipherSuite;
+                    cipherSuite = getWelcome(rumor)
+                      .cipherSuite as CiphersuiteId;
                   } catch {
                     cipherSuite = undefined;
                   }
@@ -326,7 +334,7 @@ export default withSignIn(function JoinGroup() {
             return welcomes.sort((a, b) => b.timestamp - a.timestamp);
           })(),
         ),
-      [giftWraps, account],
+      [giftWraps, account, refreshCount],
     ) ?? [];
 
   const selectedWelcome = useObservable(
@@ -386,15 +394,44 @@ export default withSignIn(function JoinGroup() {
     selectedWelcome$.next(null);
   };
 
+  const handleRefresh = () => {
+    refreshTrigger$.next(refreshTrigger$.value + 1);
+  };
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Join Group from Welcome</h1>
-        <p className="text-base-content/70">
-          Join a group by accepting a Welcome message received via NIP-59 gift
-          wrap
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Join Group from Welcome</h1>
+            <p className="text-base-content/70">
+              Join a group by accepting a Welcome message received via NIP-59
+              gift wrap
+            </p>
+          </div>
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={handleRefresh}
+            title="Refresh welcome messages"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-5 w-5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Welcome Messages List */}
