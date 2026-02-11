@@ -268,7 +268,7 @@ import { createKeyPackageEvent } from "marmot-ts/core/key-package-event";
 
 const unsignedEvent = createKeyPackageEvent({
   keyPackage: keyPackage.publicPackage,
-  pubkey,  // Required
+  pubkey, // Required
   relays,
   client: "marmot-examples",
 });
@@ -476,19 +476,19 @@ import { proposeRemoveUser } from "marmot-ts/client/group/proposals";
 
 ## API Changes Summary
 
-| Category                | Before                                    | After                              |
-| ----------------------- | ----------------------------------------- | ---------------------------------- |
-| **Join operations**     | Positional args                           | Params object with `context`       |
-| **Codec functions**     | `decodeX(x, offset)`                      | `decode(xDecoder, data)`           |
-| **Wireformat types**    | String literals                           | `wireformats` constant object      |
-| **Ciphersuite lookup**  | `getCiphersuiteFromName()`                | `ciphersuites[name]`               |
-| **Lifetime**            | Constant object                           | `defaultLifetime()` function       |
-| **PSK handling**        | `makePskIndex()`                          | `context.externalPsks` object      |
-| **Credential types**    | `CredentialTypeName` / string comparison  | `DefaultCredentialTypeName` / numeric values |
-| **Extension types**     | `ExtensionType`                           | `number`                           |
-| **Protocol versions**   | Array lookup                              | Object comparison                  |
-| **GroupStore**          | Requires `ClientConfig`                   | No config needed                   |
-| **Key package events**  | Returns `UnsignedEvent` with `pubkey`     | Returns `EventTemplate`            |
+| Category               | Before                                   | After                                        |
+| ---------------------- | ---------------------------------------- | -------------------------------------------- |
+| **Join operations**    | Positional args                          | Params object with `context`                 |
+| **Codec functions**    | `decodeX(x, offset)`                     | `decode(xDecoder, data)`                     |
+| **Wireformat types**   | String literals                          | `wireformats` constant object                |
+| **Ciphersuite lookup** | `getCiphersuiteFromName()`               | `ciphersuites[name]`                         |
+| **Lifetime**           | Constant object                          | `defaultLifetime()` function                 |
+| **PSK handling**       | `makePskIndex()`                         | `context.externalPsks` object                |
+| **Credential types**   | `CredentialTypeName` / string comparison | `DefaultCredentialTypeName` / numeric values |
+| **Extension types**    | `ExtensionType`                          | `number`                                     |
+| **Protocol versions**  | Array lookup                             | Object comparison                            |
+| **GroupStore**         | Requires `ClientConfig`                  | No config needed                             |
+| **Key package events** | Returns `UnsignedEvent` with `pubkey`    | Returns `EventTemplate`                      |
 
 ---
 
