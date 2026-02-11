@@ -5,7 +5,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 import { InviteReader } from "../client/invite-reader.js";
 import type {
   InviteStore,
-  ReceivedInvite,
+  ReceivedGiftWrap,
   UnreadInvite,
 } from "../store/invite-store.js";
 import type { KeyValueStoreBackend } from "../utils/key-value.js";
@@ -44,7 +44,7 @@ class MemoryBackend<T> implements KeyValueStoreBackend<T> {
  */
 function createMockInviteStore(): InviteStore {
   return {
-    received: new MemoryBackend<ReceivedInvite>(),
+    received: new MemoryBackend<ReceivedGiftWrap>(),
     unread: new MemoryBackend<UnreadInvite>(),
     seen: new MemoryBackend<boolean>(),
   };
@@ -268,6 +268,30 @@ describe("InviteReader", () => {
       const unreadAfter = await inviteReader.getUnread();
       expect(unreadAfter).toHaveLength(0);
     });
+
+    it("should emit inviteRead event", async () => {
+      const unread: UnreadInvite = {
+        id: "test-id-1",
+        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
+        keyPackageEventId: "kp-1",
+        sender: "sender-pubkey",
+        groupRelays: ["wss://relay.test"],
+      };
+
+      await inviteStore.unread.setItem(unread.id, unread);
+
+      let eventEmitted = false;
+      let emittedId = "";
+      inviteReader.on("inviteRead", (inviteId) => {
+        eventEmitted = true;
+        emittedId = inviteId;
+      });
+
+      await inviteReader.markAsRead(unread.id);
+
+      expect(eventEmitted).toBe(true);
+      expect(emittedId).toBe("test-id-1");
+    });
   });
 
   describe("watchUnread", () => {
@@ -288,6 +312,131 @@ describe("InviteReader", () => {
 
       expect(value).toHaveLength(1);
       expect(value[0].id).toBe(unread.id);
+    });
+
+    it("should yield when invite is marked as read", async () => {
+      // Add an unread invite
+      const unread: UnreadInvite = {
+        id: "test-id-1",
+        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
+        keyPackageEventId: "kp-1",
+        sender: "sender-pubkey",
+        groupRelays: ["wss://relay.test"],
+      };
+
+      await inviteStore.unread.setItem(unread.id, unread);
+
+      const generator = inviteReader.watchUnread();
+
+      // Get initial state (1 invite)
+      const initial = await generator.next();
+      expect(initial.value).toHaveLength(1);
+
+      // Mark as read in background
+      setTimeout(async () => {
+        await inviteReader.markAsRead(unread.id);
+      }, 10);
+
+      // Should yield when invite is marked as read
+      const updated = await generator.next();
+      expect(updated.value).toHaveLength(0);
+    });
+  });
+
+  describe("watchReceived", () => {
+    it("should yield initial received invites", async () => {
+      const pubkey = await account.signer.getPublicKey();
+      const giftWrap = createMockGiftWrap("test-id-1", pubkey);
+
+      await inviteReader.ingestEvent(giftWrap);
+
+      const generator = inviteReader.watchReceived();
+      const { value } = await generator.next();
+
+      expect(value).toHaveLength(1);
+      expect(value[0].id).toBe(giftWrap.id);
+    });
+
+    it("should yield when new gift wrap is received", async () => {
+      const pubkey = await account.signer.getPublicKey();
+      const generator = inviteReader.watchReceived();
+
+      // Get initial (empty) state
+      const initial = await generator.next();
+      expect(initial.value).toHaveLength(0);
+
+      // Add gift wrap in background
+      setTimeout(async () => {
+        const giftWrap = createMockGiftWrap("test-id-1", pubkey);
+        await inviteReader.ingestEvent(giftWrap);
+      }, 10);
+
+      // Should yield when new gift wrap is received
+      const updated = await generator.next();
+      expect(updated.value).toHaveLength(1);
+    });
+
+    it("should yield when received invite is processed", async () => {
+      const pubkey = await account.signer.getPublicKey();
+      const giftWrap = createMockGiftWrap("test-id-1", pubkey);
+
+      await inviteReader.ingestEvent(giftWrap);
+
+      const generator = inviteReader.watchReceived();
+
+      // Get initial state (1 gift wrap)
+      const initial = await generator.next();
+      expect(initial.value).toHaveLength(1);
+
+      // Process received in background (will fail to decrypt but still remove)
+      setTimeout(async () => {
+        await inviteReader.processReceived();
+      }, 10);
+
+      // Should yield when gift wrap is processed (removed)
+      const updated = await generator.next();
+      expect(updated.value).toHaveLength(0);
+    });
+  });
+
+  describe("events", () => {
+    it("should emit ReceivedGiftWrap when gift wrap is ingested", async () => {
+      const pubkey = await account.signer.getPublicKey();
+      const giftWrap = createMockGiftWrap("test-id-1", pubkey);
+
+      let eventEmitted = false;
+      let emittedInvite: any = null;
+
+      inviteReader.on("ReceivedGiftWrap", (invite) => {
+        eventEmitted = true;
+        emittedInvite = invite;
+      });
+
+      await inviteReader.ingestEvent(giftWrap);
+
+      expect(eventEmitted).toBe(true);
+      expect(emittedInvite.id).toBe(giftWrap.id);
+    });
+
+    it("should emit receivedProcessed when gift wrap is decrypted", async () => {
+      const pubkey = await account.signer.getPublicKey();
+      const giftWrap = createMockGiftWrap("test-id-1", pubkey);
+
+      await inviteReader.ingestEvent(giftWrap);
+
+      let eventEmitted = false;
+      let emittedId = "";
+
+      inviteReader.on("receivedProcessed", (inviteId) => {
+        eventEmitted = true;
+        emittedId = inviteId;
+      });
+
+      // This will fail to decrypt but should still emit receivedProcessed
+      await inviteReader.processReceived();
+
+      expect(eventEmitted).toBe(true);
+      expect(emittedId).toBe(giftWrap.id);
     });
   });
 

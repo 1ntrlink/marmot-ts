@@ -1,6 +1,10 @@
 import { unlockGiftWrap } from "applesauce-common/helpers/gift-wrap";
 import type { EventSigner } from "applesauce-core";
-import { type NostrEvent } from "applesauce-core/helpers/event";
+import {
+  kinds,
+  KnownEvent,
+  type NostrEvent,
+} from "applesauce-core/helpers/event";
 import { EventEmitter } from "eventemitter3";
 import { WELCOME_EVENT_KIND } from "../core/protocol.js";
 import {
@@ -10,16 +14,29 @@ import {
 } from "../core/welcome.js";
 import type {
   InviteStore,
-  ReceivedInvite,
+  ReceivedGiftWrap,
   UnreadInvite,
 } from "../store/invite-store.js";
+
+function isGiftWrap(event: NostrEvent): event is KnownEvent<kinds.GiftWrap> {
+  return event.kind === kinds.GiftWrap;
+}
 
 /**
  * Events emitted by InviteReader
  */
 type InviteReaderEvents = {
+  /** Emitted when a gift wrap is received and added to received store */
+  ReceivedGiftWrap: (invite: ReceivedGiftWrap) => void;
+
   /** Emitted when a new invite is successfully decrypted and added to unread */
   newInvite: (invite: UnreadInvite) => void;
+
+  /** Emitted when an invite is marked as read and removed from unread */
+  inviteRead: (inviteId: string) => void;
+
+  /** Emitted when a received invite is removed (decrypted or failed) */
+  receivedProcessed: (inviteId: string) => void;
 
   /** Emitted when an event fails to decrypt or parse */
   error: (error: Error, eventId: string) => void;
@@ -95,7 +112,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    */
   async ingestEvent(event: NostrEvent): Promise<boolean> {
     // Validate event kind
-    if (event.kind !== 1059)
+    if (!isGiftWrap(event))
       throw new Error(`Expected kind 1059 gift wrap, got kind ${event.kind}`);
 
     // Check if already seen
@@ -107,6 +124,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
 
     // Store in received state
     await this.store.received.setItem(event.id, event);
+    this.emit("ReceivedGiftWrap", event);
 
     return true;
   }
@@ -183,6 +201,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
         // Move to unread state
         await this.store.unread.setItem(giftwrap.id, unread);
         await this.store.received.removeItem(giftwrap.id);
+        this.emit("receivedProcessed", giftwrap.id);
 
         newInvites.push(unread);
         this.emit("newInvite", unread);
@@ -193,6 +212,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
 
         // Remove from received (failed to process)
         await this.store.received.removeItem(giftwrap.id);
+        this.emit("receivedProcessed", giftwrap.id);
       }
     }
 
@@ -221,9 +241,9 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    *
    * @returns Array of received invites awaiting decryption
    */
-  async getReceived(): Promise<ReceivedInvite[]> {
+  async getReceived(): Promise<ReceivedGiftWrap[]> {
     const keys = await this.store.received.keys();
-    const invites: ReceivedInvite[] = [];
+    const invites: ReceivedGiftWrap[] = [];
 
     for (const key of keys) {
       const invite = await this.store.received.getItem(key);
@@ -237,11 +257,13 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    * Mark an invite as read and remove it from storage.
    *
    * The invite's event ID remains in 'seen' store to prevent re-ingestion.
+   * Emits 'inviteRead' event after removal.
    *
    * @param inviteId - The invite ID (gift wrap event ID)
    */
   async markAsRead(inviteId: string): Promise<void> {
     await this.store.unread.removeItem(inviteId);
+    this.emit("inviteRead", inviteId);
     // Note: event ID already in 'seen' store from ingestEvent()
   }
 
@@ -249,7 +271,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    * Watch for new unread invites.
    *
    * Yields the current list of unread invites, then yields again
-   * whenever a new invite is added (via 'newInvite' event).
+   * whenever the unread list changes (via 'newInvite' or 'inviteRead' events).
    *
    * This does NOT automatically mark invites as read - the app must
    * call markAsRead() after processing each invite.
@@ -268,12 +290,53 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
     // Yield initial state
     yield await this.getUnread();
 
-    // Yield on each new invite
+    // Yield whenever unread list changes (new invite or invite read)
     while (true) {
       await new Promise<void>((resolve) => {
-        this.once("newInvite", () => resolve());
+        const handler = () => {
+          resolve();
+          this.off("newInvite", handler);
+          this.off("inviteRead", handler);
+        };
+        this.once("newInvite", handler);
+        this.once("inviteRead", handler);
       });
       yield await this.getUnread();
+    }
+  }
+
+  /**
+   * Watch for received (undecrypted) invites.
+   *
+   * Yields the current list of received gift wraps, then yields again
+   * whenever the received list changes (via 'ReceivedGiftWrap' or 'receivedProcessed' events).
+   *
+   * Useful for showing a list of pending invites that need to be decrypted.
+   *
+   * @example
+   * ```typescript
+   * for await (const received of inviteReader.watchReceived()) {
+   *   console.log(`${received.length} gift wraps waiting to decrypt`);
+   *   // Show "Decrypt Invites" button if received.length > 0
+   * }
+   * ```
+   */
+  async *watchReceived(): AsyncGenerator<ReceivedGiftWrap[]> {
+    // Yield initial state
+    yield await this.getReceived();
+
+    // Yield whenever received list changes (new gift wrap or processed)
+    while (true) {
+      await new Promise<void>((resolve) => {
+        const handler = () => {
+          resolve();
+          this.off("ReceivedGiftWrap", handler);
+          this.off("receivedProcessed", handler);
+        };
+        this.once("ReceivedGiftWrap", handler);
+        this.once("receivedProcessed", handler);
+      });
+      yield await this.getReceived();
     }
   }
 

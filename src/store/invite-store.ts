@@ -1,11 +1,11 @@
-import type { NostrEvent } from "applesauce-core/helpers/event";
 import type { Rumor } from "applesauce-common/helpers/gift-wrap";
+import type { kinds, KnownEvent } from "applesauce-core/helpers/event";
 import type { KeyValueStoreBackend } from "../utils/key-value.js";
 
 /**
  * A received gift wrap event (kind 1059) that hasn't been decrypted yet.
  */
-export interface ReceivedInvite extends NostrEvent {}
+export interface ReceivedGiftWrap extends KnownEvent<kinds.GiftWrap> {}
 
 /**
  * A successfully decrypted and parsed Welcome invite (kind 444).
@@ -31,7 +31,7 @@ export interface UnreadInvite {
  * @example
  * ```typescript
  * const inviteStore: InviteStore = {
- *   received: createMemoryBackend<ReceivedInvite>(),
+ *   received: createMemoryBackend<ReceivedGiftWrap>(),
  *   unread: createMemoryBackend<UnreadInvite>(),
  *   seen: createMemoryBackend<boolean>(),
  * };
@@ -39,7 +39,7 @@ export interface UnreadInvite {
  */
 export interface InviteStore {
   /** Storage for received (undecrypted) gift wraps */
-  received: KeyValueStoreBackend<ReceivedInvite>;
+  received: KeyValueStoreBackend<ReceivedGiftWrap>;
 
   /** Storage for decrypted/unread invites */
   unread: KeyValueStoreBackend<UnreadInvite>;
