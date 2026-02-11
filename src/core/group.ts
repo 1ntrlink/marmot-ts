@@ -7,9 +7,6 @@ import { CompleteKeyPackage } from "./key-package.js";
 import { marmotGroupDataToExtension } from "./marmot-group-data.js";
 import { MarmotGroupData } from "./protocol.js";
 
-/**
- * Parameters for creating a new MLS group.
- */
 export interface CreateGroupParams {
   /** Creator's complete key package (public + private) */
   creatorKeyPackage: CompleteKeyPackage;
@@ -21,24 +18,11 @@ export interface CreateGroupParams {
   ciphersuiteImpl: CiphersuiteImpl;
 }
 
-/**
- * Result of a successful group creation operation.
- */
 export interface CreateGroupResult {
   /** The ClientState for the created group */
   clientState: ClientState;
 }
 
-/**
- * Creates a new MLS group with Marmot Group Data Extension.
- *
- * This function orchestrates the creation of an MLS group with the creator as the sole member,
- * including proper Marmot Group Data Extension integration and RFC 9420 compliance.
- *
- * @param params - Parameters for group creation
- * @returns Promise resolving to the created group and related messages
- * @throws Error if group creation fails or parameters are invalid
- */
 export async function createGroup(
   params: CreateGroupParams,
 ): Promise<CreateGroupResult> {
@@ -49,14 +33,13 @@ export async function createGroup(
     ciphersuiteImpl,
   } = params;
   const groupId = marmotGroupData.nostrGroupId;
-  // Create Marmot Group Data Extension
+  // Always include Marmot Group Data as a GroupContext extension.
   const marmotExtension = marmotGroupDataToExtension(marmotGroupData);
 
   // Combine all extensions (Marmot extension + any additional extensions)
   const groupExtensions = [marmotExtension, ...extensions];
 
-  // Create the MLS group using ts-mls primitives and capture the ClientState
-  // In v2, createGroup takes a single params object with context
+  // ts-mls v2: createGroup takes a single params object with `context`.
   const clientState = await MLSCreateGroup({
     context: {
       cipherSuite: ciphersuiteImpl,
@@ -79,14 +62,6 @@ export type SimpleGroupOptions = {
   relays?: string[];
 };
 
-/**
- * Creates a simple group with minimal configuration for testing.
- *
- * @param creatorKeyPackage - Creator's key package
- * @param ciphersuiteImpl - Cipher suite implementation
- * @param groupName - Optional group name
- * @returns Promise resolving to the created group
- */
 export async function createSimpleGroup(
   creatorKeyPackage: CompleteKeyPackage,
   ciphersuiteImpl: CiphersuiteImpl,

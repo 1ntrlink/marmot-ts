@@ -682,7 +682,6 @@ function KeyPackageManager() {
 
       // 1. Create deletion event
       const draft = createDeleteKeyPackageEvent({
-        pubkey: account.pubkey,
         events: eventsToDelete,
       });
 

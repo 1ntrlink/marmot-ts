@@ -5,7 +5,12 @@ import { onlyEvents } from "applesauce-relay";
 import { useMemo, useState } from "react";
 import { combineLatest, of } from "rxjs";
 import { map, switchMap } from "rxjs/operators";
-import { KeyPackage } from "ts-mls";
+import {
+  KeyPackage,
+  keyPackageEncoder,
+  encode,
+  defaultCredentialTypes,
+} from "ts-mls";
 import { CredentialBasic } from "ts-mls/credential.js";
 
 import {
@@ -15,7 +20,6 @@ import {
   NostrEvent,
 } from "applesauce-core/helpers";
 import { neventEncode } from "nostr-tools/nip19";
-import { encodeKeyPackage } from "ts-mls/keyPackage.js";
 import {
   getCredentialPubkey,
   getKeyPackage,
@@ -204,10 +208,11 @@ function MLSKeyPackageContent({
   return (
     <div className="space-y-4">
       {/* Credential Section */}
-      {keyPackage.leafNode.credential.credentialType === "basic" && (
+      {keyPackage.leafNode.credential.credentialType ===
+        defaultCredentialTypes.basic && (
         <ErrorBoundary>
           <CredentialSection
-            credential={keyPackage.leafNode.credential}
+            credential={keyPackage.leafNode.credential as CredentialBasic}
             event={event}
           />
         </ErrorBoundary>
@@ -238,7 +243,7 @@ function MLSKeyPackageContent({
         </div>
         <div className="collapse-content">
           <code className="text-xs break-all select-all block">
-            {bytesToHex(encodeKeyPackage(keyPackage))}
+            {bytesToHex(encode(keyPackageEncoder, keyPackage))}
           </code>
         </div>
       </div>

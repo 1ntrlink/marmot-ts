@@ -1,6 +1,6 @@
 import localforage from "localforage";
 import { BehaviorSubject, map, shareReplay, switchMap } from "rxjs";
-import { GroupStore, defaultMarmotClientConfig } from "../../../src";
+import { GroupStore } from "../../../src";
 import accounts from "./accounts";
 
 // BehaviorSubject for the currently selected group ID
@@ -19,7 +19,6 @@ export const groupStore$ = accounts.active$.pipe(
       localforage.createInstance({
         name: `marmot-group-store-${account?.pubkey ?? "anon"}`,
       }),
-      defaultMarmotClientConfig,
     );
   }),
   shareReplay(1),

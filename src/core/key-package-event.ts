@@ -1,7 +1,7 @@
-import { NostrEvent, UnsignedEvent } from "applesauce-core/helpers/event";
+import { NostrEvent } from "applesauce-core/helpers/event";
 import { CiphersuiteId, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
 import { protocolVersions } from "ts-mls/protocolVersion.js";
-import { CustomExtension } from "ts-mls";
+import { CustomExtension, defaultCredentialTypes } from "ts-mls";
 import { greaseValues } from "ts-mls/grease.js";
 import { KeyPackage, decode, encode } from "ts-mls";
 import { keyPackageDecoder, keyPackageEncoder } from "ts-mls/keyPackage.js";
@@ -23,12 +23,11 @@ import {
   KeyPackageClient,
   MLS_VERSIONS,
 } from "./protocol.js";
+import { EventTemplate } from "nostr-tools";
 
 export type DeleteKeyPackageEventInput = string | NostrEvent;
 
 export type CreateDeleteKeyPackageEventOptions = {
-  /** Pubkey of the author of the delete event */
-  pubkey: string;
   /** List of event ids (or full events) to delete */
   events: DeleteKeyPackageEventInput[];
 };
@@ -38,8 +37,8 @@ export type CreateDeleteKeyPackageEventOptions = {
  */
 export function createDeleteKeyPackageEvent(
   options: CreateDeleteKeyPackageEventOptions,
-): UnsignedEvent {
-  const { pubkey, events } = options;
+): EventTemplate {
+  const { events } = options;
   if (!events || events.length === 0)
     throw new Error("At least one event must be provided for deletion");
 
@@ -55,7 +54,6 @@ export function createDeleteKeyPackageEvent(
   return {
     kind: 5,
     created_at: unixNow(),
-    pubkey,
     content: "",
     tags: [["k", String(KEY_PACKAGE_KIND)], ...ids.map((id) => ["e", id])],
   };
@@ -135,7 +133,6 @@ export function getKeyPackageClient(
 export type CreateKeyPackageEventOptions = {
   keyPackage: KeyPackage;
   /** Pubkey of the author (optional for drafts; required for Nostr kind 443 events) */
-  pubkey?: string;
   relays?: string[];
   client?: string;
 };
@@ -148,8 +145,8 @@ export type CreateKeyPackageEventOptions = {
  */
 export function createKeyPackageEvent(
   options: CreateKeyPackageEventOptions,
-): UnsignedEvent {
-  const { keyPackage, pubkey, relays, client } = options;
+): EventTemplate {
+  const { keyPackage, relays, client } = options;
 
   // Serialize the key package according to RFC 9420
   const encodedBytes = encode(keyPackageEncoder, keyPackage);
@@ -214,8 +211,6 @@ export function createKeyPackageEvent(
   return {
     kind: KEY_PACKAGE_KIND,
     created_at: unixNow(),
-    // UnsignedEvent still includes pubkey; allow caller to set it for signers that don't backfill.
-    pubkey: pubkey ?? "",
     content,
     tags,
   };
@@ -231,7 +226,6 @@ export function createKeyPackageEvent(
 export function getKeyPackageNostrPubkey(event: NostrEvent): string {
   const keyPackage = getKeyPackage(event);
 
-  const { defaultCredentialTypes } = require("ts-mls");
   if (
     keyPackage.leafNode.credential.credentialType !==
     defaultCredentialTypes.basic

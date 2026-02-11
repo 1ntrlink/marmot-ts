@@ -25,7 +25,7 @@ export function proposeUpdateMetadata(
       groupContextExtensions: {
         // Replace the marmot group data extension with the updated one
         extensions: replaceExtension(
-          state.groupContext.extensions as GroupContextExtension[],
+          state.groupContext.extensions,
           updatedExtension,
         ) as GroupContextExtension[],
       },

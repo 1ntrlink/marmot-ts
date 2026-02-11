@@ -3,7 +3,7 @@ import { getCiphersuiteNameFromId } from "../lib/ciphersuite";
 import { CiphersuiteId } from "ts-mls";
 
 interface CipherSuiteBadgeProps {
-  cipherSuite: CiphersuiteId;
+  cipherSuite: CiphersuiteId | number;
   className?: string;
 }
 

@@ -321,7 +321,6 @@ function useKeyPackageCreation() {
       console.log("Creating key package event...");
       const unsignedEvent = createKeyPackageEvent({
         keyPackage: keyPackage.publicPackage,
-        pubkey,
         relays,
         client: "marmot-examples",
       });

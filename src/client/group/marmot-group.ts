@@ -15,6 +15,7 @@ import {
   type ProcessMessageResult,
   Proposal,
   wireformats,
+  defaultCryptoProvider,
 } from "ts-mls";
 import {
   acceptAll,
@@ -26,7 +27,6 @@ import {
   extractMarmotGroupData,
   serializeClientState,
 } from "../../core/client-state.js";
-import { defaultMarmotClientConfig } from "../../core/client-state.js";
 import { getCredentialPubkey } from "../../core/credential.js";
 import {
   createGroupEvent,
@@ -94,8 +94,6 @@ export type MarmotGroupOptions<
   ciphersuite: CiphersuiteImpl;
   /** The nostr relay pool to use for the group. Should implement GroupNostrInterface for group operations. */
   network: NostrNetworkInterface;
-  /** Authentication policy/config used when processing MLS messages */
-  clientConfig?: import("ts-mls/clientConfig.js").ClientConfig;
   /** The storage interface for the groups application message history (optional) */
   history?: THistory | GroupHistoryFactory<THistory>;
 };
@@ -186,9 +184,6 @@ export class MarmotGroup<
   /** The storage interface for the groups application message history */
   readonly history: THistory;
 
-  /** ClientConfig used for policy knobs when processing incoming MLS messages */
-  readonly clientConfig: import("ts-mls/clientConfig.js").ClientConfig;
-
   /** Whether group state has been modified */
   dirty = false;
 
@@ -242,8 +237,6 @@ export class MarmotGroup<
     this.signer = options.signer;
     this.ciphersuite = options.ciphersuite;
     this.network = options.network;
-    // Default to the library's default client config (contains authService + policy).
-    this.clientConfig = options.clientConfig ?? defaultMarmotClientConfig;
 
     // Create the history store (optional)
     if (options.history) {
@@ -271,8 +264,7 @@ export class MarmotGroup<
   ): Promise<MarmotGroup<THistory>> {
     // Get the group's ciphersuite implementation
     // In v2, getCiphersuiteImpl is available on the cryptoProvider and takes a CiphersuiteName directly
-    const cryptoProvider =
-      options.cryptoProvider ?? (await import("ts-mls")).defaultCryptoProvider;
+    const cryptoProvider = options.cryptoProvider ?? defaultCryptoProvider;
     const cipherSuite = await cryptoProvider.getCiphersuiteImpl(
       state.groupContext.cipherSuite,
     );
@@ -358,7 +350,6 @@ export class MarmotGroup<
     const { message } = await createProposal({
       context: {
         cipherSuite: this.ciphersuite,
-        // ts-mls v2: authService is part of MlsContext, not ClientConfig
         authService: marmotAuthService,
         externalPsks: {},
       },
@@ -399,7 +390,6 @@ export class MarmotGroup<
     const { newState, message } = await createApplicationMessage({
       context: {
         cipherSuite: this.ciphersuite,
-        // ts-mls v2: authService is part of MlsContext, not ClientConfig
         authService: marmotAuthService,
         externalPsks: {},
       },
@@ -517,7 +507,6 @@ export class MarmotGroup<
     const { commit, newState, welcome } = await createCommit({
       context: {
         cipherSuite: this.ciphersuite,
-        // ts-mls v2: authService is part of MlsContext, not ClientConfig
         authService: marmotAuthService,
       },
       state: this.state,
@@ -560,13 +549,8 @@ export class MarmotGroup<
       // Send all welcome events in parallel
       // In v2, welcome is wrapped in MlsWelcomeMessage, need to access welcome.welcome
       const innerWelcome = welcome?.welcome;
-      if (!innerWelcome) {
-        // If the library returns a welcome wrapper without the actual Welcome,
-        // we still return the commit publish response.
-        console.warn(
-          "[MarmotGroup.commit] createCommit returned a welcome wrapper without an inner welcome; skipping welcome delivery",
-        );
-      } else {
+      if (!innerWelcome) return response;
+      {
         await Promise.allSettled(
           options.welcomeRecipients.map(async (recipient) => {
             const welcomeRumor = createWelcomeRumor({
@@ -813,7 +797,6 @@ export class MarmotGroup<
         const result = await processMessage({
           context: {
             cipherSuite: this.ciphersuite,
-            // ts-mls v2: authService is part of MlsContext, not ClientConfig
             authService: marmotAuthService,
             externalPsks: {},
           },

@@ -18,8 +18,6 @@ export function createCredential(pubkey: string): CredentialBasic {
   };
 }
 
-const legacyDecoder = new TextDecoder();
-
 /** Gets the nostr public key from a credential. */
 export function getCredentialPubkey(credential: Credential): string {
   if (credential.credentialType !== defaultCredentialTypes.basic)
@@ -31,13 +29,10 @@ export function getCredentialPubkey(credential: Credential): string {
   const basicCredential = credential as CredentialBasic;
   const str = bytesToHex(basicCredential.identity);
 
-  // Backwards compatibility with utf8 encoded public keys
-  if (isHexKey(str) === false) {
-    const decoded = legacyDecoder.decode(basicCredential.identity);
-    if (isHexKey(decoded) === false)
-      throw new Error("Invalid credential nostr public key");
-    return decoded;
-  }
+  // Marmot requires identity to be the raw 32-byte Nostr pubkey.
+  // If this is not 32 bytes, bytesToHex() will not yield 64 hex chars.
+  if (isHexKey(str) === false)
+    throw new Error("Invalid credential nostr public key");
 
   return str;
 }

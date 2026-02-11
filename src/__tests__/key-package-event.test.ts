@@ -1,5 +1,10 @@
 import { NostrEvent, unixNow } from "applesauce-core/helpers";
-import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
+import {
+  defaultCryptoProvider,
+  encode,
+  getCiphersuiteImpl,
+  keyPackageEncoder,
+} from "ts-mls";
 import { describe, expect, it } from "vitest";
 
 import { createCredential } from "../core/credential.js";
@@ -10,6 +15,7 @@ import {
   getKeyPackage,
 } from "../core/key-package-event.js";
 import { KEY_PACKAGE_KIND } from "../core/protocol.js";
+import { bytesToHex } from "@noble/ciphers/utils.js";
 
 const mockPubkey =
   "02a1633cafe37eeebe2b39b4ec5f3d74c35e61fa7e7e6b7b8c5f7c4f3b2a1b2c3d";
@@ -20,12 +26,10 @@ describe("createDeleteKeyPackageEvent", () => {
     const eventIds = ["abc123def456", "789ghi012jkl", "345mno678pqr"];
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: eventIds,
     });
 
     expect(deleteEvent.kind).toBe(5);
-    expect(deleteEvent.pubkey).toBe(mockPubkey);
     expect(deleteEvent.content).toBe("");
     expect(deleteEvent.created_at).toBeGreaterThan(0);
 
@@ -66,12 +70,10 @@ describe("createDeleteKeyPackageEvent", () => {
     ];
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: keyPackageEvents,
     });
 
     expect(deleteEvent.kind).toBe(5);
-    expect(deleteEvent.pubkey).toBe(mockPubkey);
 
     // Check for k tag
     const kTag = deleteEvent.tags.find((t) => t[0] === "k");
@@ -89,7 +91,6 @@ describe("createDeleteKeyPackageEvent", () => {
   it("should throw an error when no events are provided", () => {
     expect(() => {
       createDeleteKeyPackageEvent({
-        pubkey: mockPubkey,
         events: [],
       });
     }).toThrow("At least one event must be provided for deletion");
@@ -108,7 +109,6 @@ describe("createDeleteKeyPackageEvent", () => {
 
     expect(() => {
       createDeleteKeyPackageEvent({
-        pubkey: mockPubkey,
         events: [wrongKindEvent],
       });
     }).toThrow(
@@ -128,7 +128,6 @@ describe("createDeleteKeyPackageEvent", () => {
     };
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: ["stringeventid1", keyPackageEvent, "stringeventid2"],
     });
 
@@ -198,6 +197,7 @@ describe("createKeyPackageEvent encoding", () => {
     // Mock the event as if it came from a relay
     const mockEvent: NostrEvent = {
       ...event,
+      pubkey: "test-pubkey",
       id: "test-event-id",
       sig: "test-signature",
     };
@@ -221,10 +221,6 @@ describe("createKeyPackageEvent encoding", () => {
     });
 
     // Create a legacy event (hex-encoded, no encoding tag)
-    const { encode } = await import("ts-mls");
-    const { keyPackageEncoder } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/hashes/utils.js");
-
     const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const legacyEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
@@ -259,10 +255,6 @@ describe("createKeyPackageEvent encoding", () => {
       credential,
       ciphersuiteImpl,
     });
-
-    const { encode } = await import("ts-mls");
-    const { keyPackageEncoder } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/hashes/utils.js");
 
     const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const hexEvent: NostrEvent = {

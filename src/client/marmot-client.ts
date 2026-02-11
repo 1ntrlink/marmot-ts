@@ -13,7 +13,6 @@ import {
   PrivateKeyPackage,
 } from "ts-mls";
 import { CiphersuiteName, ciphersuites } from "ts-mls/crypto/ciphersuite.js";
-import { ClientConfig } from "ts-mls/clientConfig.js";
 import { marmotAuthService } from "../core/auth-service.js";
 import { createCredential } from "../core/credential.js";
 import { defaultCapabilities } from "../core/default-capabilities.js";
@@ -25,7 +24,6 @@ import {
   serializeClientState,
   SerializedClientState,
 } from "../core/client-state.js";
-import { defaultMarmotClientConfig } from "../core/client-state.js";
 import {
   GroupStateStore,
   GroupStateStoreBackend,
@@ -53,8 +51,6 @@ export type MarmotClientOptions<
   cryptoProvider?: CryptoProvider;
   /** The nostr relay pool to use for the client. Should implement GroupNostrInterface for group operations. */
   network: NostrNetworkInterface;
-  /** The ClientConfig to use for state hydration (contains auth service and policy) */
-  clientConfig?: ClientConfig;
 } & (THistory extends undefined
   ? {}
   : {
@@ -96,8 +92,6 @@ export class MarmotClient<
   readonly keyPackageStore: KeyPackageStore;
   /** The nostr relay pool to use for the client */
   readonly network: NostrNetworkInterface;
-  /** The ClientConfig used for state hydration */
-  readonly clientConfig: ClientConfig;
 
   /** Crypto provider for cryptographic operations */
   public cryptoProvider: CryptoProvider;
@@ -118,7 +112,6 @@ export class MarmotClient<
     this.keyPackageStore = options.keyPackageStore;
     this.network = options.network;
     this.cryptoProvider = options.cryptoProvider ?? defaultCryptoProvider;
-    this.clientConfig = options.clientConfig ?? defaultMarmotClientConfig;
 
     // Set the history factory if its set in the options
     this.historyFactory = (
@@ -138,7 +131,7 @@ export class MarmotClient<
 
   /** Hydrates a SerializedClientState into a ClientState using this client's config */
   private hydrateState(serialized: SerializedClientState): ClientState {
-    return deserializeClientState(serialized, this.clientConfig);
+    return deserializeClientState(serialized);
   }
 
   /** Serializes a ClientState into bytes */
@@ -320,7 +313,6 @@ export class MarmotClient<
       signer: this.signer,
       network: this.network,
       history: this.historyFactory,
-      clientConfig: this.clientConfig,
     });
 
     // Save the group to the cache
@@ -478,7 +470,6 @@ export class MarmotClient<
       signer: this.signer,
       network: this.network,
       history: this.historyFactory,
-      clientConfig: this.clientConfig,
     });
 
     // Add the group to the cache

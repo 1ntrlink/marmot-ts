@@ -9,7 +9,6 @@ import {
   defaultProposalTypes,
   unsafeTestingAuthenticationService,
 } from "ts-mls";
-import type { MlsPrivateMessage, MlsPublicMessage } from "ts-mls/message.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,10 +16,7 @@ import {
   MarmotGroup,
 } from "../client/group/marmot-group.js";
 import type { NostrNetworkInterface } from "../client/nostr-interface.js";
-import {
-  defaultMarmotClientConfig,
-  SerializedClientState,
-} from "../core/client-state.js";
+import { SerializedClientState } from "../core/client-state.js";
 import { createCredential } from "../core/credential.js";
 import { createSimpleGroup } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";

@@ -10,12 +10,8 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MarmotClient } from "../client/marmot-client";
-import {
-  defaultMarmotClientConfig,
-  extractMarmotGroupData,
-} from "../core/client-state";
+import { extractMarmotGroupData } from "../core/client-state";
 import { createCredential } from "../core/credential";
-import { deserializeApplicationRumor } from "../core/group-message";
 import { generateKeyPackage } from "../core/key-package";
 import { createKeyPackageEvent } from "../core/key-package-event";
 import {
@@ -24,11 +20,11 @@ import {
   WELCOME_EVENT_KIND,
 } from "../core/protocol";
 import { KeyPackageStore } from "../store/key-package-store";
-import { GroupStateStore } from "../store/group-state-store";
 import { KeyValueGroupStateBackend } from "../store/adapters/key-value-group-state-backend";
 import { unixNow } from "../utils/nostr";
 import { MockNetwork } from "./helpers/mock-network";
 import { MemoryBackend } from "./ingest-commit-race.test";
+import { deserializeApplicationData } from "../core/group-message";
 
 // NOTE: we use the shared test helper MockNetwork, not an inline version.
 
@@ -95,7 +91,6 @@ describe("End-to-end: invite, join, first message", () => {
 
     const unsignedKeyPackageEvent = createKeyPackageEvent({
       keyPackage: inviteeKeyPackage.publicPackage,
-      pubkey: inviteePubkey,
       relays: ["wss://mock-relay.test"],
     });
 
@@ -215,7 +210,7 @@ describe("End-to-end: invite, join, first message", () => {
     const receivedMessages: Rumor[] = [];
     for await (const result of adminGroup.ingest(newGroupEvents)) {
       if (result.kind === "applicationMessage") {
-        const rumor = deserializeApplicationRumor(result.message);
+        const rumor = deserializeApplicationData(result.message);
         receivedMessages.push(rumor);
       }
     }

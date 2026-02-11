@@ -1,4 +1,8 @@
-import { GroupContextExtension, makeCustomExtension } from "ts-mls";
+import {
+  type CustomExtension,
+  type GroupContextExtension,
+  makeCustomExtension,
+} from "ts-mls";
 import { isValidRelayUrl } from "../utils/relay-url.js";
 import {
   MARMOT_GROUP_DATA_EXTENSION_TYPE,
@@ -289,4 +293,25 @@ export function marmotGroupDataToExtension(
     extensionType: MARMOT_GROUP_DATA_EXTENSION_TYPE,
     extensionData: encodeMarmotGroupData(data),
   });
+}
+
+/** Type guard for the Marmot Group Data custom extension (0xf2ee). */
+export function isMarmotGroupDataExtension(
+  ext: GroupContextExtension,
+): ext is CustomExtension {
+  return (
+    typeof ext.extensionType === "number" &&
+    ext.extensionType === MARMOT_GROUP_DATA_EXTENSION_TYPE &&
+    ext.extensionData instanceof Uint8Array
+  );
+}
+
+/** Extracts and validates the Marmot Group Data extension payload bytes. */
+export function getMarmotGroupDataExtensionBytes(
+  ext: GroupContextExtension,
+): Uint8Array {
+  if (!isMarmotGroupDataExtension(ext)) {
+    throw new Error("Not a MarmotGroupData extension");
+  }
+  return ext.extensionData;
 }

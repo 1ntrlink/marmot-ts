@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createCredential, getCredentialPubkey } from "../core/credential.js";
 import { hexToBytes } from "@noble/hashes/utils.js";
-import { CredentialBasic } from "ts-mls/credential.js";
+import { CredentialBasic, CredentialX509 } from "ts-mls/credential.js";
 import { defaultCredentialTypes } from "ts-mls";
+import { marmotAuthService } from "../core/auth-service.js";
 
 const validPubkey =
   "1a9281606d737cf7b3c09ccdaefc47cb2af39c12d8528d54c747b8bd9e34a346";
@@ -126,17 +127,6 @@ describe("getCredentialPubkey", () => {
     );
   });
 
-  it("should handle legacy UTF-8 encoded public keys", () => {
-    const textEncoder = new TextEncoder();
-    const legacyCredential: CredentialBasic = {
-      credentialType: defaultCredentialTypes.basic,
-      identity: textEncoder.encode(validPubkey),
-    };
-
-    const extractedPubkey = getCredentialPubkey(legacyCredential);
-    expect(extractedPubkey).toBe(validPubkey);
-  });
-
   it("should reject invalid legacy credentials with non-hex UTF-8", () => {
     const textEncoder = new TextEncoder();
     const invalidLegacyCredential: CredentialBasic = {
@@ -200,5 +190,37 @@ describe("credential integration", () => {
 
     expect(credential1.identity).toEqual(credential2.identity);
     expect(credential1.credentialType).toBe(credential2.credentialType);
+  });
+
+  it("marmotAuthService accepts valid MIP-00 basic credentials", async () => {
+    const credential = createCredential(validPubkey);
+    await expect(
+      marmotAuthService.validateCredential(credential, new Uint8Array(32)),
+    ).resolves.toBe(true);
+  });
+
+  it("marmotAuthService rejects non-basic credentials", async () => {
+    const nonBasicCredential: CredentialX509 = {
+      credentialType: defaultCredentialTypes.x509,
+      certificates: [],
+    };
+
+    await expect(
+      marmotAuthService.validateCredential(
+        nonBasicCredential as any,
+        new Uint8Array(32),
+      ),
+    ).resolves.toBe(false);
+  });
+
+  it("marmotAuthService rejects basic credentials with wrong identity length", async () => {
+    const bad: CredentialBasic = {
+      credentialType: defaultCredentialTypes.basic,
+      identity: new Uint8Array(31),
+    };
+
+    await expect(
+      marmotAuthService.validateCredential(bad, new Uint8Array(32)),
+    ).resolves.toBe(false);
   });
 });

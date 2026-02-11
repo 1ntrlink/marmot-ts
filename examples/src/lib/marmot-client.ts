@@ -13,11 +13,7 @@ import {
   switchMap,
 } from "rxjs";
 import localforage from "localforage";
-import {
-  KeyValueGroupStateBackend,
-  MarmotClient,
-  defaultMarmotClientConfig,
-} from "../../../src";
+import { KeyValueGroupStateBackend, MarmotClient } from "../../../src";
 import { MarmotGroup } from "../../../src/client/group/marmot-group";
 import {
   NostrNetworkInterface,
@@ -85,7 +81,6 @@ export const marmotClient$ = combineLatest([
       groupStateBackend,
       keyPackageStore,
       network: networkInterface,
-      clientConfig: defaultMarmotClientConfig,
     });
   }),
   startWith(undefined),

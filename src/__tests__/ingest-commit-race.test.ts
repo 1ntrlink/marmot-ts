@@ -18,10 +18,7 @@ import { describe, expect, it } from "vitest";
 
 import { MarmotGroup } from "../client/group/marmot-group.js";
 import type { NostrNetworkInterface } from "../client/nostr-interface.js";
-import {
-  defaultMarmotClientConfig,
-  SerializedClientState,
-} from "../core/client-state.js";
+import { SerializedClientState } from "../core/client-state.js";
 import { createCredential } from "../core/credential.js";
 import { createGroupEvent } from "../core/group-message.js";
 import { createSimpleGroup } from "../core/group.js";
@@ -122,7 +119,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
         cipherSuite: impl,
         authService: unsafeTestingAuthenticationService,
       },
-      welcome: (welcome as any).welcome ?? (welcome as any),
+      welcome: welcome!.welcome ?? welcome,
       keyPackage: memberKeyPackage.publicPackage,
       privateKeys: memberKeyPackage.privatePackage,
       ratchetTree: undefined,
@@ -144,7 +141,6 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     });
 
     // Clone the baseline admin state to create a second independent copy for commitB.
-    // ClientState = GroupState + clientConfig, so preserve clientConfig.
     const decodedAdminGroupState = decode(
       clientStateDecoder,
       encode(clientStateEncoder, adminStateEpoch1) as any,
@@ -154,7 +150,6 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     }
     const adminStateEpoch1Clone: ClientState = {
       ...decodedAdminGroupState,
-      clientConfig: adminStateEpoch1.clientConfig,
     };
 
     const commitB = await createCommit({
@@ -277,7 +272,6 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       add: { keyPackage: memberKeyPackage.publicPackage },
     };
 
-    const { defaultProposalTypes } = await import("ts-mls");
     const addProposalTyped = {
       proposalType: defaultProposalTypes.add,
       add: { keyPackage: memberKeyPackage.publicPackage },
@@ -406,7 +400,6 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       ciphersuiteImpl: impl,
     });
 
-    const { defaultProposalTypes } = await import("ts-mls");
     const addProposal1 = {
       proposalType: defaultProposalTypes.add,
       add: { keyPackage: member1KeyPackage.publicPackage },
