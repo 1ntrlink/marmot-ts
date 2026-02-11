@@ -129,8 +129,9 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     // Per MIP-03, only admins are allowed to send commits, so both commits must be
     // authored by the admin leaf.
     //
-    // NOTE: In MLS, creating a commit updates the sender's leaf key pair, so we cannot
-    // create two commits from the same ClientState object. We must clone the state first.
+    // ts-mls v2 treats ClientState as immutable: createCommit() returns a newState
+    // object rather than mutating the passed state. Therefore, we can create two
+    // commits from the same baseline state without cloning.
     const commitA = await createCommit({
       context: {
         cipherSuite: impl,
@@ -140,24 +141,12 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       extraProposals: [],
     });
 
-    // Clone the baseline admin state to create a second independent copy for commitB.
-    const decodedAdminGroupState = decode(
-      clientStateDecoder,
-      encode(clientStateEncoder, adminStateEpoch1) as any,
-    ) as any;
-    if (!decodedAdminGroupState) {
-      throw new Error("Failed to clone adminStateEpoch1");
-    }
-    const adminStateEpoch1Clone: ClientState = {
-      ...decodedAdminGroupState,
-    };
-
     const commitB = await createCommit({
       context: {
         cipherSuite: impl,
         authService: unsafeTestingAuthenticationService,
       },
-      state: adminStateEpoch1Clone,
+      state: adminStateEpoch1,
       extraProposals: [],
     });
 
