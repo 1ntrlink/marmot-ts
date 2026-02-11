@@ -202,7 +202,7 @@ describe("InviteReader", () => {
     });
   });
 
-  describe("processReceived", () => {
+  describe("decryptGiftWraps", () => {
     it("should emit error on decrypt failure", async () => {
       const pubkey = await account.signer.getPublicKey();
       const giftWrap = createMockGiftWrap("test-id-1", pubkey);
@@ -215,7 +215,7 @@ describe("InviteReader", () => {
         expect(eventId).toBe("test-id-1");
       });
 
-      const unread = await inviteReader.processReceived();
+      const unread = await inviteReader.decryptGiftWraps();
 
       // Since we can't properly decrypt without full infrastructure, this will fail
       expect(unread).toHaveLength(0);
@@ -367,7 +367,7 @@ describe("InviteReader", () => {
 
       // Process received in background (will fail to decrypt but still remove)
       setTimeout(async () => {
-        await inviteReader.processReceived();
+        await inviteReader.decryptGiftWraps();
       }, 10);
 
       // Should yield when gift wrap is processed (removed)
@@ -410,7 +410,7 @@ describe("InviteReader", () => {
       });
 
       // This will fail to decrypt but should still emit receivedProcessed
-      await inviteReader.processReceived();
+      await inviteReader.decryptGiftWraps();
 
       expect(eventEmitted).toBe(true);
       expect(emittedId).toBe(giftWrap.id);

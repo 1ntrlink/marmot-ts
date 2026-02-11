@@ -55,7 +55,7 @@ export interface InviteReaderOptions {
  * The app is responsible for:
  * - Syncing events from relays
  * - Passing gift wrap events (kind 1059) to ingestEvent()
- * - Calling processReceived() to decrypt (triggers nip-44 decryption prompts)
+ * - Calling decryptGiftWraps() to decrypt (triggers nip-44 decryption prompts)
  * - Reading unread invites via getUnread(), watchUnread(), or event listeners
  * - Marking invites as read after processing
  *
@@ -76,7 +76,7 @@ export interface InviteReaderOptions {
  * await inviteReader.ingestEvents(giftWraps);
  *
  * // 2. Process received invites (prompts user for decryption)
- * await inviteReader.processReceived();
+ * await inviteReader.decryptGiftWraps();
  *
  * // 3. Consume unread invites
  * const unread = await inviteReader.getUnread();
@@ -147,9 +147,69 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
   }
 
   /**
-   * Process received (undecrypted) gift wraps.
+   * Process a single received (undecrypted) gift wrap by event ID.
    *
-   * Attempts to decrypt and parse each received event.
+   * Attempts to decrypt and parse the specified event.
+   * - On success: moves to 'unread' state and emits 'newInvite' event
+   * - On failure: emits 'error' event (event remains in 'seen' to prevent retry)
+   *
+   * This method prompts the user via signer for decryption.
+   * It can be used to decrypt individual invites in parallel with processReceived().
+   *
+   * @param eventId - The gift wrap event ID to decrypt
+   * @returns The decrypted welcome rumor, or null if event not found or failed to decrypt
+   * @throws Error if the event is not found in received store
+   */
+  async decryptGiftWrap(
+    eventId: string | ReceivedGiftWrap,
+  ): Promise<UnreadInvite | null> {
+    const giftwrap =
+      typeof eventId === "string"
+        ? await this.store.received.getItem(eventId)
+        : eventId;
+
+    if (!giftwrap)
+      throw new Error(`Event ${eventId} not found in received store`);
+
+    try {
+      // Decrypt gift wrap (prompts user)
+      const rumor = await unlockGiftWrap(giftwrap, this.signer);
+
+      // Validate it's a Welcome event (kind 444)
+      if (rumor.kind !== WELCOME_EVENT_KIND) {
+        throw new Error(
+          `Expected kind ${WELCOME_EVENT_KIND} Welcome, got kind ${rumor.kind}`,
+        );
+      }
+
+      // Parse and validate the Welcome message
+      // This will throw if the Welcome is malformed
+      getWelcome(rumor);
+
+      // Move to unread state (store rumor directly using rumor ID as key)
+      await this.store.unread.setItem(rumor.id, rumor);
+      await this.store.received.removeItem(giftwrap.id);
+      this.emit("receivedProcessed", giftwrap.id);
+
+      this.emit("newInvite", rumor);
+      return rumor;
+    } catch (error) {
+      // Emit error but don't retry (event stays in 'seen')
+      const err = error instanceof Error ? error : new Error(String(error));
+      this.emit("error", err, giftwrap.id);
+
+      // Remove from received (failed to process)
+      await this.store.received.removeItem(giftwrap.id);
+      this.emit("receivedProcessed", giftwrap.id);
+
+      return null;
+    }
+  }
+
+  /**
+   * Decrypts all received gift wraps.
+   *
+   * Attempts to decrypt and parse each received gift wrap.
    * - On success: moves to 'unread' state and emits 'newInvite' event
    * - On failure: emits 'error' event (event remains in 'seen' to prevent retry)
    *
@@ -158,44 +218,18 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    *
    * @returns Array of successfully decrypted welcome rumors
    */
-  async processReceived(): Promise<UnreadInvite[]> {
+  async decryptGiftWraps(): Promise<UnreadInvite[]> {
     const receivedKeys = await this.store.received.keys();
     const newInvites: UnreadInvite[] = [];
 
     for (const key of receivedKeys) {
-      const giftwrap = await this.store.received.getItem(key);
-      if (!giftwrap) continue;
-
       try {
-        // Decrypt gift wrap (prompts user)
-        const rumor = await unlockGiftWrap(giftwrap, this.signer);
-
-        // Validate it's a Welcome event (kind 444)
-        if (rumor.kind !== WELCOME_EVENT_KIND) {
-          throw new Error(
-            `Expected kind ${WELCOME_EVENT_KIND} Welcome, got kind ${rumor.kind}`,
-          );
-        }
-
-        // Parse and validate the Welcome message
-        // This will throw if the Welcome is malformed
-        getWelcome(rumor);
-
-        // Move to unread state (store rumor directly using rumor ID as key)
-        await this.store.unread.setItem(rumor.id, rumor);
-        await this.store.received.removeItem(giftwrap.id);
-        this.emit("receivedProcessed", giftwrap.id);
-
-        newInvites.push(rumor);
-        this.emit("newInvite", rumor);
+        const rumor = await this.decryptGiftWrap(key);
+        if (rumor) newInvites.push(rumor);
       } catch (error) {
-        // Emit error but don't retry (event stays in 'seen')
-        const err = error instanceof Error ? error : new Error(String(error));
-        this.emit("error", err, giftwrap.id);
-
-        // Remove from received (failed to process)
-        await this.store.received.removeItem(giftwrap.id);
-        this.emit("receivedProcessed", giftwrap.id);
+        // Event not found in received store (already processed by another call)
+        // This is expected when processing in parallel, just skip
+        continue;
       }
     }
 
