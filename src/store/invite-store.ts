@@ -8,21 +8,10 @@ import type { KeyValueStoreBackend } from "../utils/key-value.js";
 export interface ReceivedGiftWrap extends KnownEvent<kinds.GiftWrap> {}
 
 /**
- * A successfully decrypted and parsed Welcome invite (kind 444).
- * Ready for the app to consume.
+ * A successfully decrypted Welcome rumor (kind 444).
+ * All metadata can be derived from the rumor itself.
  */
-export interface UnreadInvite {
-  /** Gift wrap event ID (used as key) */
-  id: string;
-  /** Unwrapped Welcome rumor (kind 444) */
-  welcomeRumor: Rumor;
-  /** Key package event ID from rumor tags (if present) */
-  keyPackageEventId?: string;
-  /** Sender pubkey from rumor */
-  sender: string;
-  /** Group relays from rumor tags */
-  groupRelays: string[];
-}
+export interface UnreadInvite extends Rumor {}
 
 /**
  * Storage backends for invite states.
@@ -38,12 +27,12 @@ export interface UnreadInvite {
  * ```
  */
 export interface InviteStore {
-  /** Storage for received (undecrypted) gift wraps */
+  /** Storage for received (undecrypted) gift wraps - keyed by gift wrap event ID */
   received: KeyValueStoreBackend<ReceivedGiftWrap>;
 
-  /** Storage for decrypted/unread invites */
+  /** Storage for decrypted/unread welcome rumors - keyed by rumor ID */
   unread: KeyValueStoreBackend<UnreadInvite>;
 
-  /** Storage for seen event IDs (deduplication) - value is always true */
+  /** Storage for seen gift wrap event IDs (deduplication) - value is always true */
   seen: KeyValueStoreBackend<boolean>;
 }

@@ -7,11 +7,7 @@ import {
 } from "applesauce-core/helpers/event";
 import { EventEmitter } from "eventemitter3";
 import { WELCOME_EVENT_KIND } from "../core/protocol.js";
-import {
-  getWelcome,
-  getWelcomeGroupRelays,
-  getWelcomeKeyPackageEventId,
-} from "../core/welcome.js";
+import { getWelcome } from "../core/welcome.js";
 import type {
   InviteStore,
   ReceivedGiftWrap,
@@ -85,7 +81,7 @@ export interface InviteReaderOptions {
  * // 3. Consume unread invites
  * const unread = await inviteReader.getUnread();
  * for (const invite of unread) {
- *   await client.joinGroupFromWelcome({ welcomeRumor: invite.welcomeRumor });
+ *   await client.joinGroupFromWelcome({ welcomeRumor: invite });
  *   await inviteReader.markAsRead(invite.id);
  * }
  * ```
@@ -160,7 +156,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    * This method prompts the user via signer for each decryption,
    * so it should be called deliberately by the app (not automatically).
    *
-   * @returns Array of successfully decrypted invites
+   * @returns Array of successfully decrypted welcome rumors
    */
   async processReceived(): Promise<UnreadInvite[]> {
     const receivedKeys = await this.store.received.keys();
@@ -185,26 +181,13 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
         // This will throw if the Welcome is malformed
         getWelcome(rumor);
 
-        // Extract metadata from rumor
-        const keyPackageEventId = getWelcomeKeyPackageEventId(rumor);
-        const groupRelays = getWelcomeGroupRelays(rumor);
-
-        // Create unread invite
-        const unread: UnreadInvite = {
-          id: giftwrap.id,
-          welcomeRumor: rumor,
-          keyPackageEventId,
-          sender: rumor.pubkey,
-          groupRelays,
-        };
-
-        // Move to unread state
-        await this.store.unread.setItem(giftwrap.id, unread);
+        // Move to unread state (store rumor directly using rumor ID as key)
+        await this.store.unread.setItem(rumor.id, rumor);
         await this.store.received.removeItem(giftwrap.id);
         this.emit("receivedProcessed", giftwrap.id);
 
-        newInvites.push(unread);
-        this.emit("newInvite", unread);
+        newInvites.push(rumor);
+        this.emit("newInvite", rumor);
       } catch (error) {
         // Emit error but don't retry (event stays in 'seen')
         const err = error instanceof Error ? error : new Error(String(error));
@@ -222,7 +205,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
   /**
    * Get all unread invites.
    *
-   * @returns Array of unread invites
+   * @returns Array of unread welcome rumors
    */
   async getUnread(): Promise<UnreadInvite[]> {
     const keys = await this.store.unread.keys();
@@ -256,21 +239,19 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
   /**
    * Mark an invite as read and remove it from storage.
    *
-   * The invite's event ID remains in 'seen' store to prevent re-ingestion.
    * Emits 'inviteRead' event after removal.
    *
-   * @param inviteId - The invite ID (gift wrap event ID)
+   * @param inviteId - The rumor ID (from the welcome rumor)
    */
   async markAsRead(inviteId: string): Promise<void> {
     await this.store.unread.removeItem(inviteId);
     this.emit("inviteRead", inviteId);
-    // Note: event ID already in 'seen' store from ingestEvent()
   }
 
   /**
-   * Watch for new unread invites.
+   * Watch for unread invites.
    *
-   * Yields the current list of unread invites, then yields again
+   * Yields the current array of unread invites, then yields again
    * whenever the unread list changes (via 'newInvite' or 'inviteRead' events).
    *
    * This does NOT automatically mark invites as read - the app must
@@ -280,7 +261,7 @@ export class InviteReader extends EventEmitter<InviteReaderEvents> {
    * ```typescript
    * for await (const invites of inviteReader.watchUnread()) {
    *   for (const invite of invites) {
-   *     await client.joinGroupFromWelcome({ welcomeRumor: invite.welcomeRumor });
+   *     await client.joinGroupFromWelcome({ welcomeRumor: invite });
    *     await inviteReader.markAsRead(invite.id);
    *   }
    * }

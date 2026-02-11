@@ -250,33 +250,22 @@ describe("InviteReader", () => {
   describe("markAsRead", () => {
     it("should remove invite from unread", async () => {
       // Manually add an unread invite to test markAsRead
-      const unread: UnreadInvite = {
-        id: "test-id-1",
-        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
-        keyPackageEventId: "kp-1",
-        sender: "sender-pubkey",
-        groupRelays: ["wss://relay.test"],
-      };
+      const unread: UnreadInvite = createMockWelcomeRumor("rumor-1", "sender");
+      const id = "test-id-1";
 
-      await inviteStore.unread.setItem(unread.id, unread);
+      await inviteStore.unread.setItem(id, unread);
 
       const unreadBefore = await inviteReader.getUnread();
       expect(unreadBefore).toHaveLength(1);
 
-      await inviteReader.markAsRead(unread.id);
+      await inviteReader.markAsRead(id);
 
       const unreadAfter = await inviteReader.getUnread();
       expect(unreadAfter).toHaveLength(0);
     });
 
     it("should emit inviteRead event", async () => {
-      const unread: UnreadInvite = {
-        id: "test-id-1",
-        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
-        keyPackageEventId: "kp-1",
-        sender: "sender-pubkey",
-        groupRelays: ["wss://relay.test"],
-      };
+      const unread: UnreadInvite = createMockWelcomeRumor("rumor-1", "sender");
 
       await inviteStore.unread.setItem(unread.id, unread);
 
@@ -290,20 +279,14 @@ describe("InviteReader", () => {
       await inviteReader.markAsRead(unread.id);
 
       expect(eventEmitted).toBe(true);
-      expect(emittedId).toBe("test-id-1");
+      expect(emittedId).toBe("rumor-1");
     });
   });
 
   describe("watchUnread", () => {
     it("should yield initial unread invites", async () => {
       // Manually add an unread invite
-      const unread: UnreadInvite = {
-        id: "test-id-1",
-        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
-        keyPackageEventId: "kp-1",
-        sender: "sender-pubkey",
-        groupRelays: ["wss://relay.test"],
-      };
+      const unread: UnreadInvite = createMockWelcomeRumor("rumor-1", "sender");
 
       await inviteStore.unread.setItem(unread.id, unread);
 
@@ -311,18 +294,12 @@ describe("InviteReader", () => {
       const { value } = await generator.next();
 
       expect(value).toHaveLength(1);
-      expect(value[0].id).toBe(unread.id);
+      expect(value![0]).toBe(unread);
     });
 
     it("should yield when invite is marked as read", async () => {
       // Add an unread invite
-      const unread: UnreadInvite = {
-        id: "test-id-1",
-        welcomeRumor: createMockWelcomeRumor("rumor-1", "sender"),
-        keyPackageEventId: "kp-1",
-        sender: "sender-pubkey",
-        groupRelays: ["wss://relay.test"],
-      };
+      const unread: UnreadInvite = createMockWelcomeRumor("rumor-1", "sender");
 
       await inviteStore.unread.setItem(unread.id, unread);
 
