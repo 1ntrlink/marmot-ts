@@ -254,7 +254,7 @@ export function deserializeApplicationData(data: Uint8Array): Rumor {
   }
 
   // Check required fields for a rumor
-  if (!parsed.id || !parsed.pubkey || !parsed.kind === undefined) {
+  if (!parsed.id || !parsed.pubkey || parsed.kind === undefined) {
     throw new Error("Invalid application data: missing required fields");
   }
 
