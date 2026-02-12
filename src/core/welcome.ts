@@ -1,5 +1,5 @@
 import { Rumor } from "applesauce-common/helpers/gift-wrap";
-import { NostrEvent } from "applesauce-core/helpers/event";
+import { getTagValue, NostrEvent } from "applesauce-core/helpers/event";
 import { getEventHash } from "nostr-tools";
 import { decodeWelcome, encodeWelcome, type Welcome } from "ts-mls/welcome.js";
 import {
@@ -55,6 +55,17 @@ export function createWelcomeRumor({
     ...draft,
     id,
   };
+}
+
+/** Returns the key package event ID from a welcome rumor */
+export function getWelcomeKeyPackageEventId(event: Rumor): string | undefined {
+  return getTagValue(event, "e");
+}
+
+/** Returns the group relays from a welcome rumor */
+export function getWelcomeGroupRelays(event: Rumor): string[] {
+  const relaysTag = getTagValue(event, "relays");
+  return relaysTag ? relaysTag.split(",") : [];
 }
 
 /**
