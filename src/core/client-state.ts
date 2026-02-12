@@ -38,9 +38,6 @@ export function getGroupIdHex(clientState: ClientState): string {
 }
 
 export function getNostrGroupIdHex(clientState: ClientState): string {
-  if (clientState.groupContext.groupId) {
-    return bytesToHex(clientState.groupContext.groupId);
-  }
   const marmotData = extractMarmotGroupData(clientState);
   if (!marmotData) {
     throw new Error("MarmotGroupData not found in ClientState");

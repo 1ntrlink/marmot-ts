@@ -106,7 +106,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       },
       state: createdState,
       wireAsPublicMessage: false,
-      extraProposals: [addProposal as any],
+      extraProposals: [addProposal],
       ratchetTreeExtension: true, // Include ratchet tree in Welcome so members can join without external tree
     });
 
@@ -185,7 +185,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     // UpdatePath secrets are encrypted to *other* members.
     await stateStore.set(
       memberStateEpoch1.groupContext.groupId,
-      encode(clientStateEncoder, memberStateEpoch1) as any,
+      encode(clientStateEncoder, memberStateEpoch1),
     );
 
     const network: NostrNetworkInterface = {
@@ -230,7 +230,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       memberStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
+    const reloaded = decode(clientStateDecoder, reloadedBytes!);
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(group.state.groupContext.epoch);
   });
@@ -273,7 +273,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       },
       state: createdState,
       wireAsPublicMessage: false,
-      extraProposals: [addProposalTyped as any],
+      extraProposals: [addProposalTyped],
       ratchetTreeExtension: true,
     });
 
@@ -286,7 +286,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     );
     await stateStore.set(
       adminStateEpoch1.groupContext.groupId,
-      encode(clientStateEncoder, adminStateEpoch1) as any,
+      encode(clientStateEncoder, adminStateEpoch1),
     );
 
     const network: NostrNetworkInterface = {
@@ -340,7 +340,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     });
 
     const applicationEvent = await createGroupEvent({
-      message: mlsMessage as any,
+      message: mlsMessage,
       state: group.state,
       ciphersuite: impl,
     });
@@ -363,7 +363,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       adminStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
+    const reloaded = decode(clientStateDecoder, reloadedBytes!);
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(initialEpoch);
   });
@@ -402,7 +402,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
         },
         state: createdState,
         wireAsPublicMessage: false,
-        extraProposals: [addProposal1 as any],
+        extraProposals: [addProposal1],
         ratchetTreeExtension: true,
       });
 
@@ -415,7 +415,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
     );
     await stateStore.set(
       adminStateEpoch1.groupContext.groupId,
-      encode(clientStateEncoder, adminStateEpoch1) as any,
+      encode(clientStateEncoder, adminStateEpoch1),
     );
 
     const network: NostrNetworkInterface = {
@@ -464,7 +464,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
         authService: unsafeTestingAuthenticationService,
       },
       state: group.state,
-      proposal: addProposal2 as any,
+      proposal: addProposal2,
       wireAsPublicMessage: false,
     });
 
@@ -528,7 +528,7 @@ describe("MarmotGroup.ingest() commit race ordering (MIP-03)", () => {
       adminStateEpoch1.groupContext.groupId,
     );
     expect(reloadedBytes).not.toBeNull();
-    const reloaded = decode(clientStateDecoder, reloadedBytes!) as any;
+    const reloaded = decode(clientStateDecoder, reloadedBytes!);
     expect(reloaded).not.toBeNull();
     expect(reloaded!.groupContext.epoch).toBe(group.state.groupContext.epoch);
   });

@@ -550,70 +550,69 @@ export class MarmotGroup<
       // In v2, welcome is wrapped in MlsWelcomeMessage, need to access welcome.welcome
       const innerWelcome = welcome?.welcome;
       if (!innerWelcome) return response;
-      {
-        await Promise.allSettled(
-          options.welcomeRecipients.map(async (recipient) => {
-            const welcomeRumor = createWelcomeRumor({
-              welcome: innerWelcome,
-              author: actorPubkey,
-              groupRelays: groupData.relays,
-              keyPackageEventId: recipient.keyPackageEventId,
-            });
 
-            // Gift wrap the welcome event to the newly added user
-            const giftWrapEvent = await createGiftWrap({
-              rumor: welcomeRumor,
-              recipient: recipient.pubkey,
-              signer: this.signer,
-            });
+      await Promise.allSettled(
+        options.welcomeRecipients.map(async (recipient) => {
+          const welcomeRumor = createWelcomeRumor({
+            welcome: innerWelcome,
+            author: actorPubkey,
+            groupRelays: groupData.relays,
+            keyPackageEventId: recipient.keyPackageEventId,
+          });
 
-            // Get the newly added user's inbox relays using the GroupNostrInterface
-            // Fallback to group relays if inbox relays are not available
-            let inboxRelays: string[];
-            try {
-              inboxRelays = await this.network.getUserInboxRelays(
-                recipient.pubkey,
-              );
-              console.log(
-                `[MarmotGroup.commit] Retrieved inbox relays for recipient:`,
-                inboxRelays,
-              );
-            } catch (error) {
-              console.warn(
-                `[MarmotGroup.commit] Failed to get inbox relays for recipient ${recipient.pubkey.slice(
-                  0,
-                  16,
-                )}...:`,
-                error,
-              );
-              // Fallback to group relays
-              inboxRelays = groupData.relays || [];
-            }
+          // Gift wrap the welcome event to the newly added user
+          const giftWrapEvent = await createGiftWrap({
+            rumor: welcomeRumor,
+            recipient: recipient.pubkey,
+            signer: this.signer,
+          });
 
-            if (inboxRelays.length === 0) {
-              console.warn(
-                `No relays available to send Welcome to recipient ${recipient.pubkey.slice(
-                  0,
-                  16,
-                )}...`,
-              );
-              return;
-            }
-
-            const publishResult = await this.network.publish(
-              inboxRelays,
-              giftWrapEvent,
+          // Get the newly added user's inbox relays using the GroupNostrInterface
+          // Fallback to group relays if inbox relays are not available
+          let inboxRelays: string[];
+          try {
+            inboxRelays = await this.network.getUserInboxRelays(
+              recipient.pubkey,
             );
-
             console.log(
-              `[MarmotGroup.commit] Gift wrap publish result:`,
-              publishResult,
+              `[MarmotGroup.commit] Retrieved inbox relays for recipient:`,
+              inboxRelays,
             );
+          } catch (error) {
+            console.warn(
+              `[MarmotGroup.commit] Failed to get inbox relays for recipient ${recipient.pubkey.slice(
+                0,
+                16,
+              )}...:`,
+              error,
+            );
+            // Fallback to group relays
+            inboxRelays = groupData.relays || [];
+          }
 
-            // TODO: need to detect publish failure to attempt to send later
-          }),
-        );
-      }
+          if (inboxRelays.length === 0) {
+            console.warn(
+              `No relays available to send Welcome to recipient ${recipient.pubkey.slice(
+                0,
+                16,
+              )}...`,
+            );
+            return;
+          }
+
+          const publishResult = await this.network.publish(
+            inboxRelays,
+            giftWrapEvent,
+          );
+
+          console.log(
+            `[MarmotGroup.commit] Gift wrap publish result:`,
+            publishResult,
+          );
+
+          // TODO: need to detect publish failure to attempt to send later
+        }),
+      );
     }
 
     return response;

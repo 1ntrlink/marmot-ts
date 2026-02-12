@@ -74,7 +74,17 @@ export const groups$ = groupIds$.pipe(
     marmotClient$.pipe(
       defined(),
       switchMap(async (client) => {
-        const groups = await Promise.all(ids.map((id) => client.getGroup(id)));
+        const groups = (
+          await Promise.all(
+            ids.map(async (id) => {
+              try {
+                return await client.getGroup(id);
+              } catch {
+                return null;
+              }
+            }),
+          )
+        ).filter(Boolean) as MarmotGroup[];
         return groups;
       }),
     ),
@@ -85,21 +95,31 @@ export const groups$ = groupIds$.pipe(
 /** Minimal metadata used by UIs (selector, manager, side nav counts). */
 export const groupSummaries$ = groups$.pipe(
   map((groups): GroupSummary[] => {
-    return groups.map((group) => {
-      const data = extractMarmotGroupData(group.state);
-      const name = data?.name ?? "Unnamed Group";
-      const memberCount = getMemberCount(group.state);
-      const epoch = Number(group.state.groupContext.epoch);
-      const nostrGroupIdHex = getNostrGroupIdHex(group.state);
+    return groups
+      .map((group) => {
+        const data = extractMarmotGroupData(group.state);
+        const name = data?.name ?? "Unnamed Group";
+        const memberCount = getMemberCount(group.state);
+        const epoch = Number(group.state.groupContext.epoch);
 
-      return {
-        groupId: bytesToHex(group.state.groupContext.groupId),
-        name,
-        epoch,
-        memberCount,
-        nostrGroupIdHex,
-      };
-    });
+        // Defensive: getNostrGroupIdHex throws for groups without MarmotGroupData
+        let nostrGroupIdHex: string;
+        try {
+          nostrGroupIdHex = getNostrGroupIdHex(group.state);
+        } catch {
+          // Invalid group (lacks MarmotGroupData), filter it out
+          return null;
+        }
+
+        return {
+          groupId: bytesToHex(group.state.groupContext.groupId),
+          name,
+          epoch,
+          memberCount,
+          nostrGroupIdHex,
+        };
+      })
+      .filter((summary): summary is GroupSummary => summary !== null);
   }),
   shareReplay(1),
 );
