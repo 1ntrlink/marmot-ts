@@ -5,9 +5,9 @@ dist
 .vscode
 .fdignore
 lancedb
-models 
-docs
+models
 mcp.json
 plans
-ts-mls 
+ts-mls
 marmot
+.vitepress/cache
