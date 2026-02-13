@@ -57,7 +57,7 @@ PUBLISHED_PACKAGES_JSON="${1:-}"
 if [ -z "$PUBLISHED_PACKAGES_JSON" ]; then
   echo -e "${YELLOW}Warning: No published packages JSON provided${NC}"
   echo ""
-  
+
   # Fallback to reading from package.json
   if [ -f "package.json" ]; then
     echo -e "${BLUE}Reading package info from package.json...${NC}"
