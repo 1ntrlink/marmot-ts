@@ -8,17 +8,14 @@ on:
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: write # For creating releases
+  id-token: write # For npm provenance
+  pull-requests: write # For changesets PR
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write # For creating releases
-      id-token: write # For npm provenance
-      pull-requests: write # For changesets PR
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
