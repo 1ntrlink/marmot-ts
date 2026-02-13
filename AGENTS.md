@@ -1,4 +1,4 @@
-# Agent Guidelines for marmot-ts
+# Agent Guidelines for @internet-privacy/marmots
 
 This document provides essential information for AI coding agents working in this repository.
 
@@ -274,7 +274,7 @@ Follow [Semantic Versioning](https://semver.org/):
 
 ```markdown
 ---
-"marmot-ts": patch
+"@internet-privacy/marmots": patch
 ---
 
 Fix memory leak in event handler cleanup
@@ -289,7 +289,7 @@ Fix memory leak in event handler cleanup
 
 ```markdown
 ---
-"marmot-ts": minor
+"@internet-privacy/marmots": minor
 ---
 
 Add `getGroupMembers()` method to retrieve all members in a group
@@ -304,7 +304,7 @@ Add `getGroupMembers()` method to retrieve all members in a group
 
 ```markdown
 ---
-"marmot-ts": major
+"@internet-privacy/marmots": major
 ---
 
 **Breaking:** Remove deprecated `sendMessage()` method. Use `send()` instead.
@@ -336,7 +336,7 @@ Then, edit the generated file to add the package name, bump type, and **a single
 
 ```markdown
 ---
-"marmot-ts": minor
+"@internet-privacy/marmots": minor
 ---
 
 Add support for encrypted group messaging
@@ -419,7 +419,7 @@ Run `pnpm changeset add --empty`, then edit the generated file:
 
 ```markdown
 ---
-"marmot-ts": minor
+"@internet-privacy/marmots": minor
 ---
 
 Add getGroupInfo() method to retrieve group metadata
@@ -435,7 +435,7 @@ Run `pnpm changeset add --empty`, then edit the generated file:
 
 ```markdown
 ---
-"marmot-ts": patch
+"@internet-privacy/marmots": patch
 ---
 
 Fix connection retry logic to handle network timeouts
@@ -454,7 +454,7 @@ Run `pnpm changeset add --empty`, then edit the generated file:
 
 ```markdown
 ---
-"marmot-ts": major
+"@internet-privacy/marmots": major
 ---
 
 Change createGroup() to accept options object instead of positional arguments

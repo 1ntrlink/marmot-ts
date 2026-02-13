@@ -32,6 +32,21 @@ if ! command -v nak &> /dev/null; then
   exit 1
 fi
 
+# Require jq to be installed
+if ! command -v jq &> /dev/null; then
+  echo -e "${RED}Error: jq is required but not found${NC}"
+  echo ""
+  echo "Install jq from: https://stedolan.github.io/jq/"
+  echo ""
+  echo "On Linux:"
+  echo "  sudo apt-get install jq"
+  echo ""
+  echo "On macOS:"
+  echo "  brew install jq"
+  echo ""
+  exit 1
+fi
+
 # Get repository name
 if [ -z "${GITHUB_REPOSITORY:-}" ]; then
   GITHUB_REPOSITORY=$(git remote get-url origin | sed 's/.*github\.com[:/]\(.*\)\.git/\1/' || echo "unknown/repo")
@@ -41,10 +56,20 @@ fi
 PUBLISHED_PACKAGES_JSON="${1:-}"
 if [ -z "$PUBLISHED_PACKAGES_JSON" ]; then
   echo -e "${YELLOW}Warning: No published packages JSON provided${NC}"
-  echo "Usage: $0 '[{\"name\":\"pkg\",\"version\":\"1.0.0\"}]'"
   echo ""
-  echo "Using example data for testing..."
-  PUBLISHED_PACKAGES_JSON='[{"name":"marmot-ts","version":"0.1.0"}]'
+  
+  # Fallback to reading from package.json
+  if [ -f "package.json" ]; then
+    echo -e "${BLUE}Reading package info from package.json...${NC}"
+    PKG_NAME=$(jq -r '.name // "unknown"' package.json)
+    PKG_VERSION=$(jq -r '.version // "0.0.0"' package.json)
+    PUBLISHED_PACKAGES_JSON="[{\"name\":\"$PKG_NAME\",\"version\":\"$PKG_VERSION\"}]"
+    echo -e "${GREEN}Found: $PKG_NAME@$PKG_VERSION${NC}"
+  else
+    echo -e "${RED}Error: No package.json found${NC}"
+    echo "Usage: $0 '[{\"name\":\"pkg\",\"version\":\"1.0.0\"}]'"
+    exit 1
+  fi
 fi
 
 # Parse published packages into a comma-separated list
