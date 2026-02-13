@@ -5,9 +5,10 @@ dist
 .vscode
 .fdignore
 lancedb
-models 
+models
 docs
 mcp.json
 plans
-# ts-mls 
-# marmot
+
+# Ignore agent references
+references/
