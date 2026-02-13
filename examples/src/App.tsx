@@ -79,7 +79,7 @@ function ExampleView(props: { example?: Example; isSettings?: boolean }) {
               <a
                 target="_blank"
                 className="btn btn-sm btn-ghost"
-                href={`https://github.com/parres-hq/marmot-ts/tree/${import.meta.env.VITE_REPO_BRANCH || "master"}/examples/src/${path}`}
+                href={`https://github.com/marmot-protocol/marmot-ts/tree/${import.meta.env.VITE_REPO_BRANCH || "master"}/examples/src/${path}`}
               >
                 <CodeIcon /> Source
               </a>
