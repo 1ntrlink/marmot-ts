@@ -1,8 +1,9 @@
 import { NostrEvent, unixNow } from "applesauce-core/helpers";
 import {
   defaultCryptoProvider,
-  getCiphersuiteFromName,
+  encode,
   getCiphersuiteImpl,
+  keyPackageEncoder,
 } from "ts-mls";
 import { describe, expect, it } from "vitest";
 
@@ -14,6 +15,7 @@ import {
   getKeyPackage,
 } from "../core/key-package-event.js";
 import { KEY_PACKAGE_KIND } from "../core/protocol.js";
+import { bytesToHex } from "@noble/ciphers/utils.js";
 
 const mockPubkey =
   "02a1633cafe37eeebe2b39b4ec5f3d74c35e61fa7e7e6b7b8c5f7c4f3b2a1b2c3d";
@@ -24,12 +26,10 @@ describe("createDeleteKeyPackageEvent", () => {
     const eventIds = ["abc123def456", "789ghi012jkl", "345mno678pqr"];
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: eventIds,
     });
 
     expect(deleteEvent.kind).toBe(5);
-    expect(deleteEvent.pubkey).toBe(mockPubkey);
     expect(deleteEvent.content).toBe("");
     expect(deleteEvent.created_at).toBeGreaterThan(0);
 
@@ -70,12 +70,10 @@ describe("createDeleteKeyPackageEvent", () => {
     ];
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: keyPackageEvents,
     });
 
     expect(deleteEvent.kind).toBe(5);
-    expect(deleteEvent.pubkey).toBe(mockPubkey);
 
     // Check for k tag
     const kTag = deleteEvent.tags.find((t) => t[0] === "k");
@@ -93,7 +91,6 @@ describe("createDeleteKeyPackageEvent", () => {
   it("should throw an error when no events are provided", () => {
     expect(() => {
       createDeleteKeyPackageEvent({
-        pubkey: mockPubkey,
         events: [],
       });
     }).toThrow("At least one event must be provided for deletion");
@@ -112,7 +109,6 @@ describe("createDeleteKeyPackageEvent", () => {
 
     expect(() => {
       createDeleteKeyPackageEvent({
-        pubkey: mockPubkey,
         events: [wrongKindEvent],
       });
     }).toThrow(
@@ -132,7 +128,6 @@ describe("createDeleteKeyPackageEvent", () => {
     };
 
     const deleteEvent = createDeleteKeyPackageEvent({
-      pubkey: mockPubkey,
       events: ["stringeventid1", keyPackageEvent, "stringeventid2"],
     });
 
@@ -155,7 +150,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should create event with base64 encoding and encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -166,7 +161,6 @@ describe("createKeyPackageEvent encoding", () => {
 
     const event = createKeyPackageEvent({
       keyPackage: keyPackage.publicPackage,
-      pubkey: validPubkey,
       relays: ["wss://relay.example.com"],
     });
 
@@ -186,7 +180,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should be able to decode base64-encoded key package event", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -197,13 +191,13 @@ describe("createKeyPackageEvent encoding", () => {
 
     const event = createKeyPackageEvent({
       keyPackage: originalKeyPackage.publicPackage,
-      pubkey: validPubkey,
       relays: ["wss://relay.example.com"],
     });
 
     // Mock the event as if it came from a relay
     const mockEvent: NostrEvent = {
       ...event,
+      pubkey: "test-pubkey",
       id: "test-event-id",
       sig: "test-signature",
     };
@@ -217,7 +211,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should still decode legacy hex-encoded events without encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -227,19 +221,16 @@ describe("createKeyPackageEvent encoding", () => {
     });
 
     // Create a legacy event (hex-encoded, no encoding tag)
-    const { encodeKeyPackage } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/ciphers/utils.js");
-
-    const encodedBytes = encodeKeyPackage(keyPackage.publicPackage);
+    const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const legacyEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
       created_at: unixNow(),
       content: bytesToHex(encodedBytes), // Hex encoding
       tags: [
-        ["mls_version", "1.0"],
-        ["cipher_suite", "0x0001"],
-        ["extensions", "0x000a"],
+        ["mls_protocol_version", "1.0"],
+        ["mls_ciphersuite", "0x0001"],
+        ["mls_extensions", "0x000a"],
         ["relays", "wss://relay.example.com"],
         // No encoding tag
       ],
@@ -256,7 +247,7 @@ describe("createKeyPackageEvent encoding", () => {
   it("should decode hex-encoded events with explicit hex encoding tag", async () => {
     const credential = createCredential(validPubkey);
     const ciphersuiteImpl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -265,19 +256,16 @@ describe("createKeyPackageEvent encoding", () => {
       ciphersuiteImpl,
     });
 
-    const { encodeKeyPackage } = await import("ts-mls/keyPackage.js");
-    const { bytesToHex } = await import("@noble/ciphers/utils.js");
-
-    const encodedBytes = encodeKeyPackage(keyPackage.publicPackage);
+    const encodedBytes = encode(keyPackageEncoder, keyPackage.publicPackage);
     const hexEvent: NostrEvent = {
       kind: KEY_PACKAGE_KIND,
       pubkey: validPubkey,
       created_at: unixNow(),
       content: bytesToHex(encodedBytes),
       tags: [
-        ["mls_version", "1.0"],
-        ["cipher_suite", "0x0001"],
-        ["extensions", "0x000a"],
+        ["mls_protocol_version", "1.0"],
+        ["mls_ciphersuite", "0x0001"],
+        ["mls_extensions", "0x000a"],
         ["relays", "wss://relay.example.com"],
         ["encoding", "hex"], // Explicit hex tag
       ],

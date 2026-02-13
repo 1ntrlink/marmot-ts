@@ -1,11 +1,12 @@
-import { CryptoProvider, defaultCryptoProvider } from "ts-mls";
+import {
+  CryptoProvider,
+  defaultCredentialTypes,
+  defaultCryptoProvider,
+} from "ts-mls";
 import { Capabilities } from "ts-mls/capabilities.js";
 import { Credential } from "ts-mls/credential.js";
-import {
-  CiphersuiteImpl,
-  getCiphersuiteFromName,
-} from "ts-mls/crypto/ciphersuite.js";
-import { Extension } from "ts-mls/extension.js";
+import { CiphersuiteId, CiphersuiteImpl } from "ts-mls/crypto/ciphersuite.js";
+import { CustomExtension } from "ts-mls";
 import {
   KeyPackage,
   generateKeyPackage as MLSGenerateKeyPackage,
@@ -34,7 +35,7 @@ export type CompleteKeyPackage = {
 };
 
 /** Create default extensions for a key package */
-export function keyPackageDefaultExtensions(): Extension[] {
+export function keyPackageDefaultExtensions(): CustomExtension[] {
   return ensureLastResortExtension([]);
 }
 
@@ -43,10 +44,12 @@ export async function calculateKeyPackageRef(
   keyPackage: KeyPackage,
   cryptoProvider?: CryptoProvider,
 ): Promise<Uint8Array> {
-  const ciphersuite = getCiphersuiteFromName(keyPackage.cipherSuite);
-  const ciphersuiteImpl = await (
-    cryptoProvider ?? defaultCryptoProvider
-  ).getCiphersuiteImpl(ciphersuite);
+  // In v2, keyPackage.cipherSuite is a numeric ciphersuite id.
+  // Prefer id-first handling to avoid reverse mapping name<->id for correctness.
+  const provider = cryptoProvider ?? defaultCryptoProvider;
+  const ciphersuiteImpl = await provider.getCiphersuiteImpl(
+    keyPackage.cipherSuite as CiphersuiteId,
+  );
   return await makeKeyPackageRef(keyPackage, ciphersuiteImpl.hash);
 }
 
@@ -55,7 +58,7 @@ export type GenerateKeyPackageOptions = {
   credential: Credential;
   capabilities?: Capabilities;
   lifetime?: Lifetime;
-  extensions?: Extension[];
+  extensions?: CustomExtension[];
   ciphersuiteImpl: CiphersuiteImpl;
 };
 
@@ -67,21 +70,22 @@ export async function generateKeyPackage({
   extensions,
   ciphersuiteImpl,
 }: GenerateKeyPackageOptions): Promise<CompleteKeyPackage> {
-  if (credential.credentialType !== "basic")
+  if (credential.credentialType !== defaultCredentialTypes.basic)
     throw new Error("Marmot key packages must use a basic credential");
 
   // Ensure the credential has a valid pubkey
   getCredentialPubkey(credential);
 
-  return await MLSGenerateKeyPackage(
+  // In v2, generateKeyPackage takes a single params object
+  return await MLSGenerateKeyPackage({
     credential,
-    capabilities
+    capabilities: capabilities
       ? ensureMarmotCapabilities(capabilities)
       : defaultCapabilities(),
-    lifetime ?? createThreeMonthLifetime(),
-    extensions
+    lifetime: lifetime ?? createThreeMonthLifetime(),
+    extensions: extensions
       ? ensureLastResortExtension(extensions)
       : keyPackageDefaultExtensions(),
-    ciphersuiteImpl,
-  );
+    cipherSuite: ciphersuiteImpl,
+  });
 }

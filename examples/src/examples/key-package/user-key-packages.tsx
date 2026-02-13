@@ -4,7 +4,7 @@ import { getDisplayName, NostrEvent, relaySet } from "applesauce-core/helpers";
 import { useEffect, useRef, useState } from "react";
 import { BehaviorSubject, combineLatest, of, switchMap } from "rxjs";
 import { map } from "rxjs/operators";
-import { KeyPackage } from "ts-mls";
+import { KeyPackage, defaultCredentialTypes } from "ts-mls";
 import {
   getCredentialPubkey,
   getKeyPackage,
@@ -156,7 +156,8 @@ function KeyPackageCard({ event }: { event: NostrEvent }) {
         {expanded && keyPackage && (
           <div className="mt-3 space-y-2 border-t border-base-300 pt-3">
             {/* Credential Info */}
-            {keyPackage.leafNode.credential.credentialType === "basic" && (
+            {keyPackage.leafNode.credential.credentialType ===
+              defaultCredentialTypes.basic && (
               <div>
                 <div className="text-xs text-base-content/60 mb-1">
                   Credential Pubkey

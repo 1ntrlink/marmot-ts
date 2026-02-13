@@ -2,11 +2,7 @@ import { bytesToHex } from "@noble/hashes/utils.js";
 import { useState } from "react";
 import { map, switchMap } from "rxjs";
 import type { CiphersuiteName, KeyPackage } from "ts-mls";
-import {
-  defaultCryptoProvider,
-  getCiphersuiteFromName,
-  getCiphersuiteImpl,
-} from "ts-mls";
+import { defaultCryptoProvider, getCiphersuiteImpl } from "ts-mls";
 import { CompleteKeyPackage } from "../../../../src";
 import { getMemberCount } from "../../../../src/core/client-state";
 import { createCredential } from "../../../../src/core/credential";
@@ -111,9 +107,8 @@ function ConfigurationForm({
           "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519";
 
         // Get cipher suite implementation
-        const selectedCiphersuite = getCiphersuiteFromName(defaultCipherSuite);
         const ciphersuiteImpl = await getCiphersuiteImpl(
-          selectedCiphersuite,
+          defaultCipherSuite,
           defaultCryptoProvider,
         );
 

@@ -3,13 +3,12 @@ import {
   CiphersuiteImpl,
   createCommit,
   defaultCryptoProvider,
-  emptyPskIndex,
-  getCiphersuiteFromName,
   getCiphersuiteImpl,
   joinGroup,
   processMessage,
+  defaultProposalTypes,
+  unsafeTestingAuthenticationService,
 } from "ts-mls";
-import type { MlsPrivateMessage, MlsPublicMessage } from "ts-mls/message.js";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -17,14 +16,12 @@ import {
   MarmotGroup,
 } from "../client/group/marmot-group.js";
 import type { NostrNetworkInterface } from "../client/nostr-interface.js";
-import {
-  defaultMarmotClientConfig,
-  SerializedClientState,
-} from "../core/client-state.js";
+import { SerializedClientState } from "../core/client-state.js";
 import { createCredential } from "../core/credential.js";
 import { createSimpleGroup } from "../core/group.js";
 import { generateKeyPackage } from "../core/key-package.js";
-import { GroupStore } from "../store/group-store.js";
+import type { GroupStateStoreBackend } from "../store/group-state-store.js";
+import { GroupStateStore } from "../store/group-state-store.js";
 import type { KeyValueStoreBackend } from "../utils/key-value.js";
 
 class MemoryBackend<T> implements KeyValueStoreBackend<T> {
@@ -52,6 +49,29 @@ class MemoryBackend<T> implements KeyValueStoreBackend<T> {
   }
 }
 
+class MemoryGroupStateBackend implements GroupStateStoreBackend {
+  private map = new Map<string, SerializedClientState>();
+
+  async get(groupId: Uint8Array): Promise<SerializedClientState | null> {
+    return this.map.get(Buffer.from(groupId).toString("hex")) ?? null;
+  }
+
+  async set(
+    groupId: Uint8Array,
+    stateBytes: SerializedClientState,
+  ): Promise<void> {
+    this.map.set(Buffer.from(groupId).toString("hex"), stateBytes);
+  }
+
+  async remove(groupId: Uint8Array): Promise<void> {
+    this.map.delete(Buffer.from(groupId).toString("hex"));
+  }
+
+  async list(): Promise<Uint8Array[]> {
+    return [...this.map.keys()].map((hex) => Buffer.from(hex, "hex"));
+  }
+}
+
 async function createTestGroupState(
   adminPubkey: string,
   ciphersuiteImpl: CiphersuiteImpl,
@@ -72,7 +92,7 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     const adminPubkey = "a".repeat(64);
     const nonAdminPubkey = "b".repeat(64);
     const impl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -90,40 +110,50 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     });
 
     const addProposal = {
-      proposalType: "add" as const,
+      proposalType: defaultProposalTypes.add,
       add: { keyPackage: nonAdminKeyPackage.publicPackage },
     };
 
-    const { newState: adminStateEpoch1, welcome } = await createCommit(
-      { state: createdState, cipherSuite: impl },
-      {
-        wireAsPublicMessage: false,
-        extraProposals: [addProposal],
-        ratchetTreeExtension: true,
+    const { newState: adminStateEpoch1, welcome } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
       },
-    );
+      state: createdState,
+      wireAsPublicMessage: false,
+      extraProposals: [addProposal],
+      ratchetTreeExtension: true,
+    });
 
     expect(welcome).toBeTruthy();
 
     // Non-admin joins from the Welcome
-    const nonAdminStateEpoch1 = await joinGroup(
-      welcome!,
-      nonAdminKeyPackage.publicPackage,
-      nonAdminKeyPackage.privatePackage,
-      { findPsk: () => undefined },
-      impl,
-    );
+    const nonAdminStateEpoch1 = await joinGroup({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      welcome: (welcome as any).welcome ?? (welcome as any),
+      keyPackage: nonAdminKeyPackage.publicPackage,
+      privateKeys: nonAdminKeyPackage.privatePackage,
+      ratchetTree: undefined,
+    });
 
     // Non-admin attempts to create a commit (should be rejected by admin verification)
     const { commit: nonAdminCommit } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       state: nonAdminStateEpoch1,
-      cipherSuite: impl,
     });
 
     // Set up MarmotGroup with admin state
-    const backend = new MemoryBackend<SerializedClientState>();
-    const store = new GroupStore(backend, defaultMarmotClientConfig);
-    await store.add(adminStateEpoch1);
+    const store = new GroupStateStore(new MemoryGroupStateBackend());
+    await store.set(
+      adminStateEpoch1.groupContext.groupId,
+      adminStateEpoch1 as any,
+    );
 
     const network: NostrNetworkInterface = {
       request: async () => {
@@ -145,7 +175,7 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     } as EventSigner;
 
     const group = new MarmotGroup(adminStateEpoch1, {
-      store,
+      stateStore: store,
       signer,
       ciphersuite: impl,
       network,
@@ -162,13 +192,15 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
 
     const initialEpoch = group.state.groupContext.epoch;
 
-    const result = await processMessage(
-      nonAdminCommit as MlsPrivateMessage | MlsPublicMessage,
-      group.state,
-      emptyPskIndex,
-      adminCallback,
-      impl,
-    );
+    const result = await processMessage({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      state: group.state,
+      message: nonAdminCommit as any,
+      callback: adminCallback,
+    });
 
     expect(result.kind).toBe("newState");
     if (result.kind !== "newState") throw new Error("expected newState");
@@ -181,7 +213,7 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     const adminPubkey = "a".repeat(64);
     const memberPubkey = "b".repeat(64);
     const impl = await getCiphersuiteImpl(
-      getCiphersuiteFromName("MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519"),
+      "MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519",
       defaultCryptoProvider,
     );
 
@@ -202,42 +234,52 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     });
 
     const addProposal = {
-      proposalType: "add" as const,
+      proposalType: defaultProposalTypes.add,
       add: { keyPackage: memberKeyPackage.publicPackage },
     };
 
-    const { newState: adminStateEpoch1, welcome } = await createCommit(
-      { state: createdState, cipherSuite: impl },
-      {
-        wireAsPublicMessage: false,
-        extraProposals: [addProposal],
-        ratchetTreeExtension: true,
+    const { newState: adminStateEpoch1, welcome } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
       },
-    );
+      state: createdState,
+      wireAsPublicMessage: false,
+      extraProposals: [addProposal as any],
+      ratchetTreeExtension: true,
+    });
 
     expect(welcome).toBeTruthy();
 
     // A receiver (non-admin member) joins from the Welcome and will ingest the admin's commit.
     // Processing your *own* commit against your own state is not a useful scenario here and
     // can fail inside ts-mls because the sender already advanced state locally.
-    const memberStateEpoch1 = await joinGroup(
-      welcome!,
-      memberKeyPackage.publicPackage,
-      memberKeyPackage.privatePackage,
-      { findPsk: () => undefined },
-      impl,
-    );
+    const memberStateEpoch1 = await joinGroup({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      welcome: (welcome as any).welcome ?? (welcome as any),
+      keyPackage: memberKeyPackage.publicPackage,
+      privateKeys: memberKeyPackage.privatePackage,
+      ratchetTree: undefined,
+    });
 
     // Admin creates a commit (should be accepted)
     const { commit: adminCommit } = await createCommit({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
       state: adminStateEpoch1,
-      cipherSuite: impl,
     });
 
     // Set up MarmotGroup with the receiver state
-    const backend = new MemoryBackend<SerializedClientState>();
-    const store = new GroupStore(backend, defaultMarmotClientConfig);
-    await store.add(memberStateEpoch1);
+    const store = new GroupStateStore(new MemoryGroupStateBackend());
+    await store.set(
+      memberStateEpoch1.groupContext.groupId,
+      memberStateEpoch1 as any,
+    );
 
     const network: NostrNetworkInterface = {
       request: async () => {
@@ -259,7 +301,7 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
     } as EventSigner;
 
     const group = new MarmotGroup(memberStateEpoch1, {
-      store,
+      stateStore: store,
       signer,
       ciphersuite: impl,
       network,
@@ -273,13 +315,15 @@ describe("MarmotGroup admin verification (MIP-03)", () => {
       onUnverifiableCommit: "reject",
     });
 
-    const result = await processMessage(
-      adminCommit as MlsPrivateMessage | MlsPublicMessage,
-      group.state,
-      emptyPskIndex,
-      adminCallback,
-      impl,
-    );
+    const result = await processMessage({
+      context: {
+        cipherSuite: impl,
+        authService: unsafeTestingAuthenticationService,
+      },
+      state: group.state,
+      message: adminCommit as any,
+      callback: adminCallback,
+    });
 
     expect(result.kind).toBe("newState");
     if (result.kind !== "newState") throw new Error("expected newState");

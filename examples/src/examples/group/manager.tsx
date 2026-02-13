@@ -9,7 +9,7 @@ import {
 import ClientStateDataView from "../../components/data-view/client-state";
 import { withSignIn } from "../../components/with-signIn";
 import { useObservable } from "../../hooks/use-observable";
-import { groupCount$, groupStore$ } from "../../lib/group-store";
+import { destroyGroup, groupCount$, groups$ } from "../../lib/groups";
 
 // ============================================================================
 // Component: GroupCard
@@ -169,24 +169,18 @@ function LoadingState() {
 // ============================================================================
 
 function GroupManager() {
-  const groupStore = useObservable(groupStore$);
+  const hydratedGroups = useObservable(groups$) ?? [];
   const groupCount = useObservable(groupCount$);
   const [groups, setGroups] = useState<ClientState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!groupStore) {
-      setIsLoading(false);
-      return;
-    }
-
     const loadGroups = async () => {
       try {
         setIsLoading(true);
         setError(null);
-        const groupList = await groupStore.list();
-        setGroups(groupList);
+        setGroups(hydratedGroups.map((g) => g.state));
       } catch (err) {
         console.error("Failed to load groups:", err);
         setError(err instanceof Error ? err.message : String(err));
@@ -196,13 +190,11 @@ function GroupManager() {
     };
 
     loadGroups();
-  }, [groupStore, groupCount]);
+  }, [hydratedGroups, groupCount]);
 
   const handleDelete = async (groupId: string) => {
-    if (!groupStore) return;
-
     try {
-      await groupStore.remove(groupId);
+      await destroyGroup(groupId);
       setError(null);
     } catch (err) {
       console.error("Failed to delete group:", err);

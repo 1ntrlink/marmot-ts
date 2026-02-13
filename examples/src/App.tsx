@@ -26,7 +26,6 @@ function ExampleView(props: { example?: Example; isSettings?: boolean }) {
         if (typeof module.default !== "function")
           throw new Error("Example must be a function");
 
-        console.log("Loaded Example", module.default);
         setComponent(() => module.default);
       })
       .catch((error) => {
