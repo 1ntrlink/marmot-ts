@@ -74,6 +74,45 @@ ${CHANGELOG}
 EOF
 )
 
+# Get outbox relays if NOSTR_KEY is provided
+RELAYS=()
+if [ -n "${NOSTR_KEY:-}" ]; then
+  echo -e "${BLUE}Getting outbox relays from Nostr...${NC}"
+
+  # Get public key from NOSTR_KEY
+  PUBKEY=$(nak key public "$NOSTR_KEY" 2>/dev/null || echo "")
+
+  if [ -z "$PUBKEY" ]; then
+    echo -e "${YELLOW}Warning: Could not get public key from NOSTR_KEY${NC}"
+  else
+    echo -e "${BLUE}Public key: ${PUBKEY}${NC}"
+
+    # Get outbox relays for the public key
+    RELAY_LIST=$(nak outbox list "$PUBKEY" 2>/dev/null || echo "")
+
+    if [ -n "$RELAY_LIST" ]; then
+      # Convert relay list to array
+      while IFS= read -r relay; do
+        if [ -n "$relay" ]; then
+          RELAYS+=("$relay")
+        fi
+      done <<< "$RELAY_LIST"
+    fi
+  fi
+
+  # Fallback to default relays if none found
+  if [ ${#RELAYS[@]} -eq 0 ]; then
+    echo -e "${YELLOW}Warning: No outbox relays found, using defaults${NC}"
+    RELAYS=(
+      "wss://relay.damus.io"
+      "wss://nos.lol"
+      "wss://relay.primal.net"
+    )
+  else
+    echo -e "${GREEN}Found ${#RELAYS[@]} outbox relay(s)${NC}"
+  fi
+fi
+
 # Check if NOSTR_KEY is provided
 if [ -z "${NOSTR_KEY:-}" ]; then
   echo -e "${YELLOW}=== DRY RUN MODE ===${NC}"
@@ -83,9 +122,10 @@ if [ -z "${NOSTR_KEY:-}" ]; then
   echo "$MESSAGE"
   echo ""
   echo -e "${GREEN}--- Relays ---${NC}"
+  echo "  (Default relays - set NOSTR_KEY to see your outbox relays)"
   echo "  - wss://relay.damus.io"
   echo "  - wss://nos.lol"
-  echo "  - wss://relay.nostr.band"
+  echo "  - wss://relay.primal.net"
   echo ""
   echo -e "${YELLOW}To publish for real, set the NOSTR_KEY environment variable:${NC}"
   echo "  export NOSTR_KEY='your-nsec-or-hex-key'"
@@ -95,9 +135,13 @@ fi
 
 # Publish to Nostr relays
 echo -e "${GREEN}Publishing to Nostr...${NC}"
-echo "$MESSAGE" | nak event --kind 1 --sec "$NOSTR_KEY" \
-  --relay wss://relay.damus.io \
-  --relay wss://nos.lol \
-  --relay wss://relay.nostr.band
+echo -e "${BLUE}Using relays:${NC}"
+for relay in "${RELAYS[@]}"; do
+  echo "  - $relay"
+done
+echo ""
+
+# Relays are passed as positional arguments at the end
+echo "$MESSAGE" | nak publish --sec "$NOSTR_KEY" "${RELAYS[@]}"
 
 echo -e "${GREEN}✓ Successfully published to Nostr!${NC}"
