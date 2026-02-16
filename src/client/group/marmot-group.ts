@@ -48,6 +48,7 @@ import {
 } from "../errors.js";
 import { NostrNetworkInterface, PublishResponse } from "../nostr-interface.js";
 import { marmotAuthService } from "../../core/auth-service.js";
+import { getGroupMembers } from "../../core/group-members.js";
 import { proposeInviteUser } from "./proposals/invite-user.js";
 
 /**
@@ -465,7 +466,12 @@ export class MarmotGroup<
     if (options?.extraProposals && options.extraProposals.length > 0) {
       for (const item of options.extraProposals.flat()) {
         if (typeof item === "function") {
-          newProposals.push(await item(context));
+          const result = await item(context);
+          if (Array.isArray(result)) {
+            newProposals.push(...result);
+          } else {
+            newProposals.push(result);
+          }
         } else {
           newProposals.push(item);
         }
@@ -908,7 +914,21 @@ export class MarmotGroup<
     await this.save();
 
     // ============================================================================
-    // STEP 6: Recursively retry unreadable events
+    // STEP 6: Self-removal guard
+    // ============================================================================
+    // If a commit removed us from the group, we must NOT retry unreadable
+    // events. Without this guard a removed member could use the post-commit
+    // key schedule to decrypt messages from the new epoch, violating
+    // forward secrecy.
+
+    const selfPubkey = await this.signer.getPublicKey();
+    if (!getGroupMembers(this.state).includes(selfPubkey)) {
+      // We were removed — stop processing.
+      return;
+    }
+
+    // ============================================================================
+    // STEP 7: Recursively retry unreadable events
     // ============================================================================
     // After processing commits and updating the state, some events that were
     // unreadable might now be readable. For example:

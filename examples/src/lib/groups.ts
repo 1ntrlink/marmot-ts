@@ -68,27 +68,30 @@ export type GroupSummary = {
   nostrGroupIdHex: string;
 };
 
-/** Hydrated group objects for all locally stored groups. */
-export const groups$ = groupIds$.pipe(
-  switchMap((ids) =>
-    marmotClient$.pipe(
-      defined(),
-      switchMap(async (client) => {
-        const groups = (
-          await Promise.all(
-            ids.map(async (id) => {
-              try {
-                return await client.getGroup(id);
-              } catch {
-                return null;
-              }
-            }),
-          )
-        ).filter(Boolean) as MarmotGroup[];
-        return groups;
-      }),
-    ),
-  ),
+/**
+ * Hydrated group objects for all locally stored groups.
+ *
+ * Subscribes to `groupStoreChanges$` (not `groupIds$`) so that state-only
+ * changes — epoch advances, member additions/removals — propagate to the UI.
+ * `groupIds$` uses `distinctUntilChanged` on the ID list, which blocks
+ * emissions when only a group's internal state changes.
+ */
+export const groups$ = groupStoreChanges$.pipe(
+  switchMap(async (client) => {
+    const ids = await client.groupStateStore.list();
+    const groups = (
+      await Promise.all(
+        ids.map(async (id) => {
+          try {
+            return await client.getGroup(id);
+          } catch {
+            return null;
+          }
+        }),
+      )
+    ).filter(Boolean) as MarmotGroup[];
+    return groups;
+  }),
   shareReplay(1),
 );
 

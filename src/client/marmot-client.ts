@@ -210,11 +210,22 @@ export class MarmotClient<
     return group;
   }
 
-  /** Loads all groups from the store and returns them */
+  /** Loads all groups from the store and returns them.
+   *  Groups that fail to load (e.g. corrupted state) are skipped so that
+   *  one bad group does not prevent all others from loading. */
   async loadAllGroups(): Promise<MarmotGroup<THistory>[]> {
     const groupIds = await this.groupStateStore.list();
 
-    return await Promise.all(groupIds.map((groupId) => this.getGroup(groupId)));
+    const results = await Promise.allSettled(
+      groupIds.map((groupId) => this.getGroup(groupId)),
+    );
+
+    return results
+      .filter(
+        (r): r is PromiseFulfilledResult<MarmotGroup<THistory>> =>
+          r.status === "fulfilled",
+      )
+      .map((r) => r.value);
   }
 
   /** Imports a new group from a ClientState object */
