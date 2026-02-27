@@ -161,6 +161,8 @@ type MarmotGroupEvents<THistory extends BaseGroupHistory | undefined = any> = {
   destroyed: (group: MarmotGroup<THistory>) => void;
   /** Emitted when history persistence fails (best-effort, non-blocking) */
   historyError: (error: Error) => void;
+  /** Emitted when a Welcome gift-wrap publish fails after retry */
+  welcomePublishFailed: (info: { recipientPubkey: string; relays: string[] }) => void;
 };
 
 /**
@@ -606,17 +608,35 @@ export class MarmotGroup<
             return;
           }
 
-          const publishResult = await this.network.publish(
+          let publishResult = await this.network.publish(
             inboxRelays,
             giftWrapEvent,
           );
 
-          console.log(
-            `[MarmotGroup.commit] Gift wrap publish result:`,
-            publishResult,
-          );
+          if (!hasAck(publishResult)) {
+            // Single retry — relay may have been transiently unavailable
+            console.warn(
+              `[MarmotGroup.commit] Welcome publish to ${recipient.pubkey.slice(0, 16)}... got no relay ack, retrying...`,
+            );
+            publishResult = await this.network.publish(
+              inboxRelays,
+              giftWrapEvent,
+            );
+          }
 
-          // TODO: need to detect publish failure to attempt to send later
+          if (!hasAck(publishResult)) {
+            console.error(
+              `[MarmotGroup.commit] Welcome publish to ${recipient.pubkey.slice(0, 16)}... failed after retry — recipient may not receive invitation`,
+            );
+            this.emit('welcomePublishFailed', {
+              recipientPubkey: recipient.pubkey,
+              relays: inboxRelays,
+            });
+          } else {
+            console.log(
+              `[MarmotGroup.commit] Welcome published for ${recipient.pubkey.slice(0, 16)}...`,
+            );
+          }
         }),
       );
     }
